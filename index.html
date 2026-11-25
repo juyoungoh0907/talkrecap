@@ -132,6 +132,19 @@ h1 em{font-style:normal;color:var(--sun)}
 .tap.l{left:0}.tap.r{right:0;width:68%}
 
 /* 이미지 저장 모달 */
+.diag{width:100%;max-width:560px;background:var(--ink-2);border-radius:14px;padding:12px 16px;font-size:13.5px}
+.diag summary{cursor:pointer;font-weight:700}
+.diag .warn{color:var(--sun);margin:10px 0 0}
+.diag code{display:block;background:var(--ink);border-radius:8px;padding:6px 8px;margin-top:4px;font-size:12px;overflow-x:auto;white-space:pre}
+.diag ol{list-style:none;margin:10px 0;padding:0;display:grid;gap:2px;max-height:300px;overflow:auto}
+.diag li label{display:grid;grid-template-columns:auto 2.2em minmax(0,1fr) auto;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;cursor:pointer}
+.diag li label:hover{background:var(--ink)}
+.diag li.me label{background:var(--line)}
+.diag .dn{overflow-wrap:anywhere}.diag .dc,.diag .rk{font-variant-numeric:tabular-nums;color:var(--mute)}
+.diag .zero .dn{color:var(--mute)}
+.diag select{background:var(--ink);color:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:5px 8px}
+.diag .btn{padding:8px 14px;font-size:13px}
+.diag p{margin:8px 0}
 .modal{position:fixed;inset:0;background:rgba(10,8,24,.88);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
   padding:max(20px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(20px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .modal img{max-height:72vh;max-width:100%;border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
@@ -209,6 +222,7 @@ h1 em{font-style:normal;color:var(--sun)}
     <button class="btn" id="saveBtn" type="button">이미지로 저장</button>
   </div>
   <div class="meta" id="meta"></div>
+  <details class="diag" id="diag"></details>
 </section>
 
 <div class="modal" id="modal" hidden>
@@ -258,8 +272,12 @@ const RE = {
   sysLine: /(님이\s?(들어왔습니다|나갔습니다|퇴장했습니다)|님을\s?(초대했습니다|내보냈습니다)|님이 .*초대했습니다|채팅방 관리자가|방장이|부방장|메시지를 가렸습니다|님과 카카오톡 대화|저장한 날짜)/
 };
 const MEDIA = /^(사진(\s?\d+장)?|동영상|음성메시지|음성 메시지|파일\s?[:：].*|<(사진|동영상|파일) 읽지 않음>|Photo|Photos|Video|File:.*|지도:.*|연락처:.*)$/;
+const FILE_EXT = 'jpe?g|png|gif|heic|heif|webp|bmp|mp4|mov|avi|m4a|mp3|wav|aac|pdf|zip|hwpx?|docx?|xlsx?|pptx?|txt|csv|apk';
+const FILELIKE = new RegExp('^(\\S+\\.(' + FILE_EXT + '))(\\s+\\S+\\.(' + FILE_EXT + '))*$','i');
+const FILE_TOKEN = new RegExp('\\S+\\.(' + FILE_EXT + ')\\b','gi');
 const EMOTI = /^(이모티콘|\(이모티콘\)|Emoticon)$/;
 const DELETED = /^(삭제된 메시지입니다\.?|This message was deleted\.?)$/;
+const kindOf = b => EMOTI.test(b)?'emoticon': (MEDIA.test(b)||FILELIKE.test(b))?'media': DELETED.test(b)?'deleted':'text';
 
 function hour24(ap,h){ h=+h; if(!ap) return h; const pm = ap==='오후' || /pm/i.test(ap); if(h===12) return pm?12:0; return pm?h+12:h; }
 
@@ -267,7 +285,7 @@ function parseChat(raw){
   const text = raw.replace(/\r\n?/g,'\n');
   if(/^\s*"?Date"?\s*,\s*"?User"?\s*,\s*"?Message"?/i.test(text)) return parseMacCSV(text);
   const lines = text.split('\n');
-  const msgs=[]; const fmt={PC:0,Android:0,iPhone:0}; let room='', cur=null, curDate=null, system=0;
+  const msgs=[]; const fmt={PC:0,Android:0,iPhone:0}; let room='', cur=null, curDate=null, system=0, unparsed=0; const samples=[];
   const push=(y,mo,d,h,mi,name,body,f)=>{
     name=name.trim(); body=(body||'');
     cur={t:new Date(y,mo-1,d,h,mi).getTime(),y,mo,d,h,mi,name,text:body};
@@ -287,15 +305,18 @@ function parseChat(raw){
     if(RE.dayHdr.test(L)){ cur=null; continue; }
     if(RE.aStamp.test(L) || RE.iStamp.test(L)){ system++; cur=null; continue; }        // 타임스탬프만 있고 "이름 :"이 없는 줄 = 입장/퇴장 등 시스템 메시지
     if(RE.sysLine.test(L) && /(습니다|했습니다)\.?$/.test(L)){ system++; cur=null; continue; } // PC 시스템 메시지
+    if(/^\[[^\]]+\]\s?\[|^\d{4}\s?[.년\-\/]\s?\d{1,2}/.test(L) || /^[^:]{1,30}\s:\s/.test(L)){   // 메시지처럼 생겼는데 형식을 못 맞춘 줄
+      unparsed++; if(samples.length<5) samples.push(L.slice(0,90));
+    }
     if(cur) cur.text += '\n' + L;                                                       // 여러 줄 메시지의 다음 줄
   }
   for(const m of msgs){
     const b=m.text.trim();
-    m.kind = EMOTI.test(b)?'emoticon': MEDIA.test(b)?'media': DELETED.test(b)?'deleted':'text';
+    m.kind = kindOf(b);
   }
   msgs.sort((a,b)=>a.t-b.t);
   const format = Object.entries(fmt).sort((a,b)=>b[1]-a[1])[0];
-  return {room, msgs, system, format: format[1]?format[0]:'알 수 없음'};
+  return {room, msgs, system, unparsed, samples, format: format[1]?format[0]:'알 수 없음'};
 }
 
 function parseMacCSV(text){
@@ -319,10 +340,10 @@ function parseMacCSV(text){
     const y=+m[1],mo=+m[2],d=+m[3],h=hour24(m[4],m[5]),mi=+m[6];
     const b=body.trim();
     msgs.push({t:new Date(y,mo-1,d,h,mi).getTime(),y,mo,d,h,mi,name,text:body,
-      kind:EMOTI.test(b)?'emoticon':MEDIA.test(b)?'media':DELETED.test(b)?'deleted':'text'});
+      kind:kindOf(b)});
   }
   msgs.sort((a,b)=>a.t-b.t);
-  return {room:'',msgs,system:0,format:'Mac(CSV)'};
+  return {room:'',msgs,system:0,unparsed:0,samples:[],format:'Mac(CSV)'};
 }
 
 /* ====================================================================
@@ -333,13 +354,14 @@ const STOP = new Set(('그리고 그래서 그러니까 그런데 근데 그럼 
  '있어 없어 있는 없는 있고 없고 있다 없다 있음 없음 했어 했는데 했다 하는데 하는 하고 하면 해서 해도 해야 하자 할게 할래 한다 했음 '+
  '같아 같은 같이 그런 이런 저런 정도 약간 조금 많이 너무 되게 완전 엄청 진심 그치 맞아 맞지 근데요 이렇게 그렇게 저렇게 '+
  '뭐야 뭔가 뭐지 뭐해 어디 언제 누가 어떻게 왜케 그때 이번 다음 오늘은 하나 그거야 거야 건데 는데 아마 일단 한번 '+
- '사진 이모티콘 동영상 삭제된 메시지입니다 https http www com 샵검색').split(/\s+/));
+ '사진 이모티콘 동영상 삭제된 메시지입니다 https http www com 샵검색 '+
+ 'jpg jpeg png gif heic webp mp4 mov pdf zip hwp docx xlsx pptx kakaotalk img image photo video file 파일 사진들 장').split(/\s+/));
 const JOSA = ['에서는','에게서','이라고','이라서','한테는','으로는','에서','에게','한테','으로','이랑','까지','부터','처럼','보다','라고','은','는','을','를','이','가','도','에','로','랑','와','과','의'];
 const KEEP = new Set(['고양이','어린이','다이어트','오이']);
 function stem(w){ if(KEEP.has(w)) return w; for(const j of JOSA){ if(w.length-j.length>=2 && w.endsWith(j)) return w.slice(0,-j.length); } return w; }
 function tokens(text){
   const out=[];
-  const clean = text.replace(/https?:\/\/\S+/g,' ').replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu,' ').replace(/[ㄱ-ㅎㅏ-ㅣ]+/g,' ');
+  const clean = text.replace(/https?:\/\/\S+/g,' ').replace(FILE_TOKEN,' ').replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu,' ').replace(/[ㄱ-ㅎㅏ-ㅣ]+/g,' ');
   for(let w of clean.split(/[^\p{L}\p{N}]+/u)){
     if(w.length<2 || /^\d+$/.test(w)) continue;
     w = stem(w.toLowerCase());
@@ -456,7 +478,7 @@ function analyze(all, range){
 /* ====================================================================
    4. 카드 렌더링
    ==================================================================== */
-const state = {data:null, ranges:[], range:null, A:null, idx:0, mask:false, quote:true, sample:false};
+const state = {data:null, ranges:[], range:null, A:null, idx:0, mask:false, quote:true, sample:false, alias:new Map(), me:''};
 const fmtN = n => Math.round(n).toLocaleString('ko-KR');
 const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function nm(n){ if(!state.mask) return esc(n); const a=[...n]; if(a.length<=1) return esc(n); if(a.length===2) return esc(a[0]+'*'); return esc(a[0]+'*'.repeat(a.length-2)+a[a.length-1]); }
@@ -473,6 +495,12 @@ function ranking(list, val, max){
 function bars(arr, hi, color){
   const mx=Math.max(1,...arr);
   return `<div class="k-bars" style="color:${color||'currentColor'}">${arr.map((v,i)=>`<i class="${hi(i)?'hi':''}" style="height:${Math.max(2,100*v/mx)}%"></i>`).join('')}</div>`;
+}
+function meLine(A,key,txt,shown){
+  if(!state.me) return '';
+  const list=[...A.people].sort((a,b)=>key(b)-key(a)); const i=list.findIndex(p=>p.name===state.me);
+  if(i<0 || i<shown) return '';
+  return `<div class="k-note" style="margin-top:2.4cqw;opacity:1;font-weight:700">나(${nm(state.me)}) · ${txt(list[i],i+1)}</div>`;
 }
 function empty(cls,eyebrow,title,msg,n){ return `<div class="card ${cls}"><div class="k-eyebrow">${eyebrow}</div><div class="k-title">${title}</div><div class="k-sub" style="margin-top:6cqw">${msg}</div>${foot(n)}</div>`; }
 
@@ -497,7 +525,7 @@ function cards(){
     <div class="k-hero ${heroCls(T.name)}" style="margin-top:8cqw">${nm(T.name)}</div>
     <div class="k-sub">${fmtN(T.count)}개 · 전체 대화의 ${(100*T.count/A.N).toFixed(1)}%</div>
     <div class="k-note">대화한 날마다 평균 ${(T.count/Math.max(1,A.activeDays)).toFixed(1)}개씩. 이 방의 공기는 이 사람이 채웠습니다.</div>
-    <div style="margin-top:auto">${ranking(top5,p=>fmtN(p.count),T.count)}</div>${foot('02')}</div>`);
+    <div style="margin-top:auto">${ranking(top5,p=>fmtN(p.count),T.count)}${meLine(A,p=>p.count,(p,r)=>`${r}위 · ${fmtN(p.count)}개 (${(100*p.count/A.N).toFixed(1)}%)`,5)}</div>${foot('02')}</div>`);
   // 3. 가장 뜨거운 날
   const [dk,dc]=A.days[0]; const [yy,mm,dd]=dk.split('-').map(Number); const wd='일월화수목금토'[new Date(yy,mm-1,dd).getDay()];
   const peakM = A.months.indexOf(Math.max(...A.months));
@@ -591,16 +619,50 @@ function render(){
   $('#count').textContent=`${state.idx+1} / ${CARDS.length}`;
   $('#prev').disabled=state.idx===0; $('#next').disabled=state.idx===CARDS.length-1;
 }
+function renderDiag(){
+  const A=state.A, d=state.data, box=$('#diag'); const wasOpen=box.open;
+  const inRange=new Set(A.people.map(p=>p.name));
+  const allNames=[...new Set(d.msgs.map(m=>state.alias.get(m.name)||m.name))];
+  const zero=allNames.filter(n=>!inRange.has(n));
+  const merged=[...state.alias.entries()];
+  box.innerHTML=`<summary>분석 확인 · 멤버 ${fmtN(A.people.length)}명${d.unparsed?` · <span style="color:var(--sun)">인식 못한 줄 ${fmtN(d.unparsed)}개</span>`:''}</summary>
+    <p>내 이름 <select id="meSel"><option value="">선택 안 함</option>${[...A.people.map(p=>p.name),...zero].map(n=>`<option ${n===state.me?'selected':''}>${esc(n)}</option>`).join('')}</select>
+    <span style="color:var(--mute)"> 고르면 5위 밖이어도 카드에 내 순위가 표시됩니다.</span></p>
+    <p style="color:var(--mute)">닉네임을 바꿔 한 사람이 두 이름으로 나뉘었다면, 두 이름을 체크하고 합치세요. 메시지가 더 많은 이름으로 합쳐집니다.</p>
+    <ol>${A.people.map((p,i)=>`<li class="${p.name===state.me?'me':''}"><label><input type="checkbox" class="mg" value="${esc(p.name)}"><span class="rk">${i+1}</span><span class="dn">${esc(p.name)}</span><span class="dc">${fmtN(p.count)}개</span></label></li>`).join('')}
+      ${zero.map(n=>`<li class="zero"><label><input type="checkbox" class="mg" value="${esc(n)}"><span class="rk">-</span><span class="dn">${esc(n)}</span><span class="dc">이 기간 0개</span></label></li>`).join('')}</ol>
+    <div class="row"><button class="btn" type="button" id="mergeBtn">선택한 이름 합치기</button>${merged.length?`<button class="btn ghost" type="button" id="unmergeBtn">합치기 취소 (${merged.length})</button>`:''}</div>
+    ${d.unparsed?`<p class="warn">메시지처럼 보이지만 형식을 인식하지 못한 줄이 ${fmtN(d.unparsed)}개 있습니다. 이 줄들은 앞 메시지에 이어 붙었습니다. 특정 사람이 빠졌다면 이 형식 때문일 수 있습니다. 예시:</p>${d.samples.map(x=>`<code>${esc(x)}</code>`).join('')}`:''}`;
+  box.open=wasOpen;
+}
+$('#diag').addEventListener('change',e=>{
+  if(e.target.id==='meSel'){ state.me=e.target.value; render(); renderDiag(); }
+});
+$('#diag').addEventListener('click',e=>{
+  if(e.target.id==='mergeBtn'){
+    const picked=[...document.querySelectorAll('#diag .mg:checked')].map(x=>x.value);
+    if(picked.length<2) return;
+    const cnt=n=>state.data.msgs.filter(m=>(state.alias.get(m.name)||m.name)===n).length;
+    const target=picked.sort((a,b)=>cnt(b)-cnt(a))[0];
+    for(const [k,v] of [...state.alias]) if(picked.includes(v)) state.alias.set(k,target);
+    for(const n of picked) if(n!==target) state.alias.set(n,target);
+    state.alias.delete(target);
+    if(picked.includes(state.me)) state.me=target;
+    runAnalysis();
+  }
+  if(e.target.id==='unmergeBtn'){ state.alias=new Map(); runAnalysis(); }
+});
 function go(d){ const n=state.idx+d; if(n<0||n>=CARDS.length) return; state.idx=n; render(); }
 function runAnalysis(){
-  state.A=analyze(state.data.msgs,state.range);
+  const src = state.alias.size ? state.data.msgs.map(m=>state.alias.has(m.name)?{...m,name:state.alias.get(m.name)}:m) : state.data.msgs;
+  state.A=analyze(src,state.range);
   const d=state.data;
   $('#meta').textContent=`${state.sample?'샘플 데이터 · ':''}${d.format} 형식 · 전체 ${fmtN(d.msgs.length)}개 중 이 기간 ${fmtN(state.A.N)}개 분석${d.system?` · 시스템 메시지 ${fmtN(d.system)}개 제외`:''}`;
-  render();
+  render(); renderDiag();
 }
 function openDeck(data,isSample){
   if(!data.msgs.length) throw new Error('메시지를 하나도 읽지 못했습니다. 카카오톡 "대화 내보내기"로 받은 파일이 맞는지 확인해주세요.');
-  state.data=data; state.sample=!!isSample; state.idx=0;
+  state.data=data; state.sample=!!isSample; state.idx=0; state.alias=new Map(); state.me='';
   state.ranges=buildRanges(data.msgs);
   state.range=defaultRange(state.ranges,data.msgs);
   $('#range').innerHTML=state.ranges.map(r=>`<option value="${r.key}" ${r===state.range?'selected':''}>${esc(r.label)}</option>`).join('');
