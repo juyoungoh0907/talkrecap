@@ -3,230 +3,227 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="카카오톡 단톡방 대화를 브라우저 안에서만 분석해 연말 결산 카드를 만드는 웹앱">
-<title>단톡 Recap</title>
+<meta name="description" content="카카오톡 단톡방 대화를 브라우저 안에서만 분석해 1년 결산을 보여주는 웹앱">
+<title>단톡 리캡</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
-/* Layout: 한 화면짜리 앱. 업로드 화면(설명 + 드롭존 + 샘플 카드 미리보기) → 9:16 스토리 카드 덱.
-   단일 다크 룩으로 고정(연말 결산 무드). 카드마다 고유 원색 배경. */
+/* Layout: 홈은 가운데 정렬 한 화면(로고·제목·업로드 바·형식 토글·칩), 결과는 1120px 2열 패널 대시보드.
+   단일 라이트 룩(의도적). 흰 패널 + 옅은 회청색 바탕 + 인디고 포인트 하나. */
 :root{
   padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
-  --ink:#16132C; --ink-2:#221E40; --line:#38335E; --paper:#FBF6EA; --mute:#A7A1C8;
-  --sun:#FFE04A; --coral:#FF5B4A; --lime:#C6F25A; --night:#0B1736; --moon:#F3E7C0;
-  --pink:#FF94CA; --cobalt:#3446F2; --orange:#FF9A2C;
-  --display:'Black Han Sans','Noto Sans KR',system-ui,sans-serif;
-  --body:'Noto Sans KR',system-ui,-apple-system,'Apple SD Gothic Neo',sans-serif;
-  color-scheme:dark;
+  --bg:#F4F5F8; --surface:#FFFFFF; --line:#E6E8EE; --line-2:#EEF0F4;
+  --text:#1A1C22; --sub:#5F6472; --faint:#9AA0AE;
+  --accent:#4E5FE6; --accent-soft:#A9B3F3; --accent-bg:#EEF0FD;
+  --good:#2E9E4F; --warn:#E39B1B; --hot:#E5484D;
+  --g1:#CFE8D6; --g2:#F8E6BF; --g3:#F8D3C2; --g4:#F5C9CB;
+  --font:'Noto Sans KR',system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%}
-body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--body);font-size:15px;line-height:1.6;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));-webkit-font-smoothing:antialiased}
-button,select,label{font-family:inherit}
-:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
-.wrap{max-width:1120px;margin:0 auto;padding-block:40px 64px}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,select,input{font-family:inherit;font-size:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
 
-/* ---------- 업로드 화면 ---------- */
-.intro{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:48px;align-items:center}
-.eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--sun);font-weight:700}
-h1{font-family:var(--display);font-weight:400;font-size:clamp(40px,6.2vw,76px);line-height:1.04;letter-spacing:-.01em;margin:.25em 0 .35em;text-wrap:balance}
-h1 em{font-style:normal;color:var(--sun)}
-.lede{color:var(--mute);max-width:34em;margin:0 0 28px}
-.drop{border:2px dashed var(--line);border-radius:18px;padding:28px 24px;background:var(--ink-2);display:grid;gap:14px;transition:border-color .15s,background .15s}
-.drop.over{border-color:var(--sun);background:#2A2550}
-.drop strong{font-size:18px}
-.drop p{margin:0;color:var(--mute);font-size:14px}
-.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.btn{appearance:none;border:0;border-radius:999px;padding:12px 20px;font-weight:700;font-size:15px;cursor:pointer;background:var(--sun);color:var(--ink)}
-.btn.ghost{background:transparent;color:var(--paper);box-shadow:inset 0 0 0 1.5px var(--line)}
-.btn.ghost:hover{box-shadow:inset 0 0 0 1.5px var(--mute)}
+/* ---------- 홈 ---------- */
+.glow{position:fixed;left:50%;top:-180px;width:1400px;height:560px;transform:translateX(-50%);pointer-events:none;z-index:0;
+  background:radial-gradient(closest-side,rgba(78,95,230,.12),rgba(78,95,230,.05) 55%,transparent)}
+#home{position:relative;z-index:1;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-block:48px}
+.logo{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,#fff 40%,var(--accent-bg));box-shadow:0 0 0 2px var(--accent-soft),0 8px 24px rgba(78,95,230,.15)}
+.logo.sm{width:30px;height:30px;box-shadow:0 0 0 1.5px var(--accent-soft)}
+#home h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:18px 0 4px}
+.desc{color:var(--sub);margin:0 0 26px}
+.drop{width:min(620px,100%);display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 7px 7px 20px;
+  box-shadow:0 6px 22px rgba(26,28,34,.06);transition:border-color .15s,box-shadow .15s;text-align:left;cursor:pointer}
+.drop.over{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-bg)}
+.drop span{flex:1;min-width:0;color:var(--faint);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{appearance:none;border:0;border-radius:999px;padding:11px 22px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;white-space:nowrap}
+.btn:hover{filter:brightness(1.06)}
+.btn.soft{background:var(--accent-soft)}
+.btn.line{background:var(--surface);color:var(--text);border:1px solid var(--line);font-weight:500;padding:8px 14px;font-size:13px}
+.btn.line:hover{border-color:var(--faint)}
 .btn:disabled{opacity:.5;cursor:default}
-.lock{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--mute);margin-top:4px}
-.lock b{color:var(--lime);font-weight:700}
-.status{font-size:14px;min-height:1.6em;color:var(--sun)}
-.status.err{color:var(--coral)}
-.preview{position:relative;height:520px}
-.preview .card{position:absolute;width:250px;top:50%;left:50%;box-shadow:0 30px 60px rgba(0,0,0,.45);pointer-events:none}
-.preview .card:nth-child(1){transform:translate(-112%,-48%) rotate(-9deg)}
-.preview .card:nth-child(2){transform:translate(-50%,-54%) rotate(1deg);z-index:2}
-.preview .card:nth-child(3){transform:translate(12%,-46%) rotate(9deg)}
-.preview-tag{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:12px;color:var(--mute)}
+.status{min-height:22px;margin-top:10px;font-size:13px;color:var(--accent)}
+.status.err{color:var(--hot)}
+.seg{display:inline-flex;background:#E9EBF1;border-radius:999px;padding:3px;gap:2px;margin-top:14px}
+.seg button{border:0;background:transparent;border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--sub);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.guide{font-size:12.5px;color:var(--sub);margin:10px 0 0;min-height:20px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;color:var(--text)}
+.chip:hover{border-color:var(--accent-soft);color:var(--accent)}
+.chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.privacy{margin-top:22px;font-size:12px;color:var(--faint)}
+.method{width:min(620px,100%);margin-top:14px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px;font-size:12.5px;color:var(--sub)}
+.method p{margin:4px 0}.method b{color:var(--text)}
 
-.how{margin-top:56px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-.how h2{grid-column:1/-1;font-family:var(--display);font-weight:400;font-size:26px;margin:0}
-.how article{background:var(--ink-2);border-radius:14px;padding:18px;min-width:0}
-.how h3{margin:0 0 6px;font-size:15px}
-.how ol{margin:0;padding-left:1.1em;color:var(--mute);font-size:13.5px}
-.how small{display:block;margin-top:8px;color:var(--mute);font-size:12px}
-.method{margin-top:40px;color:var(--mute);font-size:13px;border-top:1px solid var(--line);padding-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 28px}
-.method b{color:var(--paper)}
+/* ---------- 결과 ---------- */
+#result{max-width:1140px;margin:0 auto;padding-block:20px 56px}
+.top{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px}
+.top .grow{flex:1}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0 20px}
+.toolbar .seg{margin:0}
+.toolbar label{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--sub);cursor:pointer;padding:0 6px}
+.toolbar .sp{flex:1}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;margin-bottom:16px}
+.head h2{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.25;overflow-wrap:anywhere}
+.head h2 small{font-size:12.5px;color:var(--faint);font-weight:500;margin-left:6px}
+.head .big{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.head .big em{font-style:normal;color:var(--accent);font-size:14px;font-weight:700;margin-left:6px}
+.info{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px;font-size:12px;color:var(--sub);line-height:1.5}
+.info b{display:block;color:var(--text);font-size:12.5px}
+.head .sp{flex:1}
 
-/* ---------- 덱 화면 ---------- */
-#deck{min-height:100%;display:flex;flex-direction:column;align-items:center;gap:14px;padding-block:16px 24px}
-.bar{width:100%;max-width:560px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;font-size:13px}
-.bar select{background:var(--ink-2);color:var(--paper);border:1.5px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px}
-.bar label{display:flex;gap:6px;align-items:center;color:var(--mute);cursor:pointer}
-.meta{font-size:12px;color:var(--mute);text-align:center}
-.stage{--w:min(100%,420px,calc((100dvh - 200px) * 9 / 16));width:var(--w);min-width:260px;position:relative;touch-action:pan-y}
-.progress{display:flex;gap:4px;margin-bottom:10px}
-.progress i{flex:1;height:4px;border-radius:2px;background:var(--line);transition:background .2s}
-.progress i.on{background:var(--sun)}
-.controls{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
-.controls .count{font-variant-numeric:tabular-nums;color:var(--mute);min-width:48px;text-align:center;font-size:14px}
-.round{width:46px;height:46px;padding:0;border-radius:50%;font-size:18px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 22px 20px;min-width:0;position:relative}
+.panel.wide{grid-column:1/-1}
+.panel > header{display:flex;align-items:baseline;gap:8px;margin-bottom:14px}
+.panel h3{margin:0;font-size:15px;font-weight:800;letter-spacing:-.01em}
+.panel h3 + small{color:var(--faint);font-size:12px}
+.panel > header .ico{margin-left:auto;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 9px;font-size:12px;color:var(--sub);cursor:pointer}
+.panel > header .ico:hover{color:var(--accent);border-color:var(--accent-soft)}
+.exp-only{display:none;margin-top:14px;padding-top:10px;border-top:1px solid var(--line-2);font-size:11px;color:var(--faint);justify-content:space-between}
+.who{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.2;overflow-wrap:anywhere}
+.who-sub{color:var(--sub);margin:2px 0 14px;font-size:13px}
+.note{font-size:12px;color:var(--faint);margin-top:12px}
 
-/* ---------- 카드(9:16, 내부 크기는 cqw로 비례) ---------- */
-.card{container-type:inline-size;aspect-ratio:9/16;width:100%;max-width:100%;border-radius:22px;overflow:hidden;position:relative;
-  line-height:1.5;background:var(--ink);color:var(--paper);user-select:none}
-.card .blob{position:absolute;border-radius:50%;pointer-events:none}
-.card > .in{position:absolute;inset:0;padding:7cqw 7cqw 6cqw;display:flex;flex-direction:column;gap:3cqw;font-size:3.7cqw}
-.k-eyebrow{font-size:3.1cqw;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.8}
-.k-title{font-family:var(--display);font-size:8.4cqw;line-height:1.12;font-weight:400;letter-spacing:-.01em}
-.k-hero{font-family:var(--display);font-size:17cqw;line-height:1;font-weight:400;letter-spacing:-.02em;overflow-wrap:anywhere}
-.k-hero.mid{font-size:13cqw}.k-hero.sm{font-size:10cqw}
-.k-sub{font-size:4.2cqw;font-weight:700}
-.k-note{font-size:3cqw;opacity:.72;line-height:1.45}
-.k-foot{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;font-size:2.8cqw;font-weight:700;letter-spacing:.08em;opacity:.75}
-.k-grid{display:grid;grid-template-columns:1fr 1fr;gap:2.4cqw}
-.k-stat{border-radius:3.5cqw;padding:3cqw 3.4cqw;background:rgba(255,255,255,.08)}
-.k-stat b{display:block;font-family:var(--display);font-weight:400;font-size:7.4cqw;line-height:1.1;font-variant-numeric:tabular-nums}
-.k-stat span{font-size:3cqw;opacity:.75}
-.k-rank{display:grid;gap:1.8cqw}
-.k-rank .r{display:grid;grid-template-columns:6cqw minmax(0,1fr) auto;gap:2cqw;align-items:center;font-size:3.6cqw}
-.k-rank .r .n{font-family:var(--display);font-size:4.4cqw}
-.k-rank .r .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
-.k-rank .r .v{font-variant-numeric:tabular-nums;font-weight:700}
-.k-rank .track{grid-column:2/4;height:1.6cqw;border-radius:1cqw;background:rgba(0,0,0,.14);overflow:hidden;margin-top:-1cqw}
-.k-rank .track i{display:block;height:100%;border-radius:1cqw;background:currentColor}
-.k-bars{display:flex;align-items:flex-end;gap:.8cqw;height:24cqw}
-.k-bars i{flex:1;border-radius:.8cqw .8cqw 0 0;background:currentColor;opacity:.35;min-height:.6cqw}
-.k-bars i.hi{opacity:1}
-.k-axis{display:flex;justify-content:space-between;font-size:2.6cqw;opacity:.7;font-variant-numeric:tabular-nums;margin-top:-1.6cqw}
-.k-chips{display:flex;flex-wrap:wrap;gap:1.6cqw}
-.k-chips span{border-radius:999px;padding:1cqw 2.8cqw;font-weight:700;font-size:3.4cqw;background:rgba(0,0,0,.1)}
-.k-chips span em{font-style:normal;opacity:.6;font-weight:500;margin-left:1cqw;font-size:2.8cqw}
-.k-quote{border-radius:4cqw;padding:4cqw 4.4cqw;background:var(--paper);color:var(--ink);font-size:4cqw;font-weight:700;line-height:1.45;overflow-wrap:anywhere}
-.k-quote small{display:block;font-size:2.9cqw;font-weight:500;opacity:.65;margin-top:1.4cqw}
-.k-awards{display:grid;gap:2cqw}
-.k-awards div{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:2cqw;border-bottom:1px solid rgba(255,255,255,.16);padding-bottom:1.8cqw}
-.k-awards span{font-size:3.2cqw;opacity:.75}
-.k-awards b{font-family:var(--display);font-weight:400;font-size:5.6cqw;text-align:right;overflow-wrap:anywhere}
+.rank{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.rank li{display:grid;grid-template-columns:22px minmax(0,7.5em) minmax(0,1fr) auto;gap:10px;align-items:center;padding:5px 6px;border-radius:8px;font-size:13px}
+.rank li.me{background:var(--accent-bg)}
+.rank .n{color:var(--faint);font-size:12px;text-align:right}
+.rank .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank .bar{height:8px;border-radius:4px;background:var(--line-2);overflow:hidden}
+.rank .bar i{display:block;height:100%;border-radius:4px;background:var(--accent-soft)}
+.rank li:first-child .bar i,.rank li.me .bar i{background:var(--accent)}
+.rank .v{font-weight:700;text-align:right;min-width:3.5em}
+.rank .v small{color:var(--faint);font-weight:500;margin-left:4px}
+.habits{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.habits li{border:1px solid var(--line-2);border-radius:10px;padding:8px 10px;min-width:0}
+.habits li.me{border-color:var(--accent-soft);background:var(--accent-bg)}
+.habits .nm{font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.habits .w{font-weight:800;font-size:15px;overflow-wrap:anywhere}
+.habits .w small{font-weight:500;color:var(--faint);font-size:11.5px;margin-left:4px}
+.words{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.words span{border-radius:999px;padding:4px 11px;background:var(--line-2);font-weight:700}
+.words span small{font-weight:500;color:var(--faint);margin-left:4px;font-size:11px}
+.words span.t1{background:var(--accent);color:#fff;font-size:20px;padding:6px 16px}
+.words span.t1 small{color:#DDE1FF}
+.words span.t2{background:var(--accent-bg);color:var(--accent);font-size:16px}
+.quote{border-radius:12px;background:var(--bg);padding:12px 14px;margin:4px 0 14px;font-weight:700;overflow-wrap:anywhere}
+.quote small{display:block;color:var(--faint);font-weight:500;font-size:12px;margin-top:4px}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font-weight:500;color:var(--faint);font-size:12px;text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl td{padding:6px;text-align:right;border-bottom:1px solid var(--line-2);font-variant-numeric:tabular-nums}
+.tbl tr.me td{background:var(--accent-bg)}
+.tbl td.nm{max-width:9em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{overflow-x:auto}
+.awards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.award{border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;min-width:0}
+.award .t{font-size:12px;color:var(--sub)}
+.award .p{font-size:17px;font-weight:800;margin:2px 0;overflow-wrap:anywhere}
+.award .d{font-size:12px;color:var(--faint)}
+.heat{display:grid;grid-template-columns:24px repeat(24,minmax(0,1fr));gap:3px;font-size:10.5px;color:var(--faint)}
+.heat i{aspect-ratio:1;border-radius:3px;background:var(--accent);display:block}
+.heat span{display:flex;align-items:center;justify-content:center}
+.gauge-wrap{text-align:center}
+.gauge-score{font-size:46px;font-weight:800;letter-spacing:-.03em;line-height:1;margin-top:-18px}
+.gauge-score small{font-size:15px;color:var(--faint);font-weight:500;margin-left:2px}
+.pill{display:inline-block;border-radius:999px;padding:3px 14px;color:#fff;font-weight:700;margin:10px 0 8px}
+.factor{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:7px}
+.factor li{display:grid;grid-template-columns:5.5em minmax(0,1fr) 2.6em;gap:10px;align-items:center;font-size:12.5px}
+.factor .bar{height:8px;border-radius:4px;background:var(--line-2);overflow:hidden}
+.factor .bar i{display:block;height:100%;background:var(--good);border-radius:4px}
+.factor b{text-align:right;font-variant-numeric:tabular-nums}
+.duo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800;flex-wrap:wrap}
+.duo i{font-style:normal;color:var(--accent)}
+svg text{font-family:var(--font)}
 
-.c-intro{background:linear-gradient(160deg,#211C49 0%,#16132C 70%);color:var(--paper)}
-.c-talk{background:var(--coral);color:var(--ink)}
-.c-day{background:var(--orange);color:var(--ink)}
-.c-word{background:var(--lime);color:var(--ink)}
-.c-night{background:linear-gradient(180deg,#0B1736 0%,#1A2A5E 100%);color:var(--moon)}
-.c-laugh{background:var(--pink);color:var(--ink)}
-.c-seen{background:var(--cobalt);color:#F3F2FF}
-.c-sum{background:var(--ink);color:var(--paper)}
-.c-sum .k-hero{color:var(--sun)}
+/* 멤버 관리 */
+.members .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mlist{list-style:none;padding:0;margin:12px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
+.mlist li{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:8px;align-items:center;border:1px solid var(--line-2);border-radius:10px;padding:6px 10px;font-size:13px}
+.mlist li.off{background:var(--bg);color:var(--faint)}
+.mlist li.off .nm{text-decoration:line-through}
+.mlist .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mlist .c{color:var(--faint);font-size:12px}
+.tag{font-size:11px;border-radius:999px;padding:1px 7px;background:#FFF1D6;color:#9A6400}
+.tog{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer;color:var(--sub)}
+.tog.on{background:var(--hot);border-color:var(--hot);color:#fff}
+.tog.me{background:var(--accent);border-color:var(--accent);color:#fff}
+.warn{color:#9A6400;background:#FFF6E3;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:8px}
+.warn code{display:block;margin-top:4px;font-size:11.5px;white-space:pre;overflow-x:auto}
 
-.tap{position:absolute;top:14px;bottom:0;width:32%;z-index:3;cursor:pointer}
-.tap.l{left:0}.tap.r{right:0;width:68%}
-
-/* 이미지 저장 모달 */
-.diag{width:100%;max-width:560px;background:var(--ink-2);border-radius:14px;padding:12px 16px;font-size:13.5px}
-.diag summary{cursor:pointer;font-weight:700}
-.diag .warn{color:var(--sun);margin:10px 0 0}
-.diag code{display:block;background:var(--ink);border-radius:8px;padding:6px 8px;margin-top:4px;font-size:12px;overflow-x:auto;white-space:pre}
-.diag ol{list-style:none;margin:10px 0;padding:0;display:grid;gap:2px;max-height:300px;overflow:auto}
-.diag li label{display:grid;grid-template-columns:auto 2.2em minmax(0,1fr) auto;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;cursor:pointer}
-.diag li label:hover{background:var(--ink)}
-.diag li.me label{background:var(--line)}
-.diag .dn{overflow-wrap:anywhere}.diag .dc,.diag .rk{font-variant-numeric:tabular-nums;color:var(--mute)}
-.diag .zero .dn{color:var(--mute)}
-.diag select{background:var(--ink);color:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:5px 8px}
-.diag .btn{padding:8px 14px;font-size:13px}
-.diag p{margin:8px 0}
-.modal{position:fixed;inset:0;background:rgba(10,8,24,.88);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+.modal{position:fixed;inset:0;background:rgba(26,28,34,.55);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   padding:max(20px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(20px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-.modal img{max-height:72vh;max-width:100%;border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
-.modal p{margin:0;color:var(--mute);font-size:13px;text-align:center}
+.modal img{max-height:74vh;max-width:100%;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.25);background:#fff}
+.modal p{margin:0;color:#fff;font-size:13px;text-align:center}
 
-@media (max-width:860px){
-  .intro{grid-template-columns:1fr;gap:28px}
-  .preview{height:380px;order:-1}
-  .preview .card{width:180px}
-  .how{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media (max-width:520px){ .how{grid-template-columns:1fr} .wrap{padding-block:20px 48px} }
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-@keyframes rise{from{transform:translateY(10px);opacity:.4}to{transform:none;opacity:1}}
-.stage .card{animation:rise .28s ease-out}
+@media (max-width:860px){ .grid{grid-template-columns:1fr} .awards{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:480px){ #home h1{font-size:25px} .drop span{font-size:13px} .rank li{grid-template-columns:20px minmax(0,6em) minmax(0,1fr) auto;gap:8px} .panel{padding:18px 16px} .heat{font-size:9px;gap:2px} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
+<div class="glow" aria-hidden="true"></div>
 
-<main id="home" class="wrap">
-  <section class="intro">
-    <div>
-      <div class="eyebrow">Group Chat Recap · 2026</div>
-      <h1>올해 우리 단톡방,<br><em>결산</em>해볼까요?</h1>
-      <p class="lede">카카오톡 대화 내보내기 파일을 올리면 1년 치 대화를 분석해 수다왕, 읽씹왕, 올해의 단어, 새벽 3시 출몰자, 웃음 제조기를 카드로 보여드립니다. 연말 모임 단톡방에 바로 올릴 수 있는 이미지로 저장됩니다.</p>
-      <div class="drop" id="drop">
-        <strong>대화 파일을 여기에 끌어다 놓으세요</strong>
-        <p>.txt · .csv · .zip (PC·Android·iPhone·Mac 내보내기 지원)</p>
-        <div class="row">
-          <label class="btn" for="file" tabindex="0" id="pick">파일 선택</label>
-          <input id="file" type="file" accept=".txt,.csv,.zip,text/plain,text/csv,application/zip" hidden>
-          <button class="btn ghost" id="sampleBtn" type="button">샘플 단톡방으로 체험</button>
-        </div>
-        <div class="status" id="status" role="status"></div>
-        <div class="lock"><span aria-hidden="true">🔒</span><span><b>서버 전송 없음.</b> 파일은 이 브라우저 메모리 안에서만 읽고 분석합니다. 페이지를 닫으면 사라지며 어디에도 저장되지 않습니다.</span></div>
-      </div>
-    </div>
-    <div class="preview" id="preview" aria-hidden="true"></div>
-  </section>
-
-  <section class="how">
-    <h2>대화 내보내기 방법</h2>
-    <article><h3>PC (Windows)</h3><ol><li>채팅방 열기</li><li>우측 상단 ≡ 메뉴</li><li>대화 내용 → 대화 내보내기</li><li>.txt로 저장 후 업로드</li></ol></article>
-    <article><h3>Android</h3><ol><li>채팅방 ≡ → 우측 상단 ⚙ 설정</li><li>대화 내용 내보내기</li><li>텍스트만 보내기</li><li>내 기기/드라이브에 저장 후 업로드</li></ol></article>
-    <article><h3>iPhone</h3><ol><li>채팅방 ≡ → 우측 상단 ⚙ 설정</li><li>대화 내용 내보내기</li><li>텍스트 메시지만 보내기</li><li>파일 앱에 저장 후 업로드</li></ol><small>.zip으로 받았다면 그대로 올려도 됩니다.</small></article>
-    <article><h3>Mac</h3><ol><li>채팅방 열기</li><li>메뉴 → 대화 내보내기</li><li>CSV 파일로 저장</li><li>.csv 업로드</li></ol><small>메뉴 위치는 앱 버전에 따라 조금씩 다릅니다.</small></article>
-  </section>
-
-  <section class="method">
-    <div><b>수다왕</b> · 기간 내 보낸 메시지 수(사진·이모티콘 포함)</div>
-    <div><b>읽씹왕</b> · 1시간 공백으로 대화를 나눈 뒤, 2명 이상·5개 이상 오간 대화에 끼지 않은 비율이 가장 높은 사람(메시지 20개 이상 멤버 대상)</div>
-    <div><b>올해의 단어</b> · 조사·접속사·자음(ㅋㅎ)·링크를 걸러낸 단어 빈도</div>
-    <div><b>새벽 3시 출몰</b> · 02:00–04:59 메시지 수와 출몰한 밤의 수</div>
-    <div><b>웃음 제조기</b> · 메시지 후 5분 안에 다른 사람이 ㅋㅋ·😂로 반응한 횟수(반응자×메시지 기준 중복 제거)</div>
-  </section>
+<main id="home">
+  <div class="logo" aria-hidden="true">
+    <svg width="38" height="38" viewBox="0 0 38 38"><circle cx="19" cy="19" r="15" fill="none" stroke="#A9B3F3" stroke-width="2"/><path d="M10 17.5c0-4.4 4-7.5 9-7.5s9 3.1 9 7.5-4 7.5-9 7.5c-1 0-2-.1-2.9-.4L11.5 27l1-4.1C10.9 21.5 10 19.6 10 17.5z" fill="#4E5FE6"/><circle cx="15" cy="17.5" r="1.3" fill="#fff"/><circle cx="19" cy="17.5" r="1.3" fill="#fff"/><circle cx="23" cy="17.5" r="1.3" fill="#fff"/></svg>
+  </div>
+  <h1>단톡 리캡</h1>
+  <p class="desc">카카오톡 단톡방 1년 치 대화를 12가지 지표로 결산해 드립니다.</p>
+  <label class="drop" id="drop" for="file">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9AA0AE" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
+    <span id="dropText">대화 내보내기 파일(.txt · .csv · .zip)을 끌어다 놓으세요</span>
+    <span class="btn" style="flex:none;color:#fff;font-size:14px">파일 선택</span>
+  </label>
+  <input id="file" type="file" accept=".txt,.csv,.zip,text/plain,text/csv,application/zip" hidden>
+  <div class="status" id="status" role="status"></div>
+  <div class="seg" role="group" aria-label="내보내기 방법">
+    <button type="button" data-g="pc" aria-pressed="true">PC</button>
+    <button type="button" data-g="and" aria-pressed="false">Android</button>
+    <button type="button" data-g="ios" aria-pressed="false">iPhone</button>
+    <button type="button" data-g="mac" aria-pressed="false">Mac</button>
+  </div>
+  <p class="guide" id="guide"></p>
+  <div class="chips">
+    <button class="chip" type="button" id="sampleBtn">샘플 단톡방으로 체험</button>
+    <button class="chip" type="button" id="methodBtn" aria-expanded="false">분석 기준 보기</button>
+  </div>
+  <div class="method" id="method" hidden>
+    <p><b>수다왕</b> 보낸 메시지 수 · <b>입버릇</b> 그 사람이 유독 많이 쓰는 단어(본인 빈도 ÷ 방 전체 빈도)</p>
+    <p><b>읽씹왕</b> 1시간 공백으로 대화를 나눈 뒤, 2명 이상·5개 이상 오간 대화에 끼지 않은 비율(메시지 20개 이상 멤버)</p>
+    <p><b>웃음 제조기</b> 메시지 후 5분 안에 다른 사람이 ㅋㅋ·😂로 반응한 횟수(반응자×메시지 중복 제거)</p>
+    <p><b>새벽 출몰</b> 02:00–04:59 메시지와 출몰한 밤 수 · <b>단톡 화력</b> 활동일·대화량·웃음·참여 균형·야행성 5개 지표 각 20점</p>
+  </div>
+  <p class="privacy">파일은 서버로 보내지 않고 이 브라우저 안에서만 분석합니다. 창을 닫으면 사라집니다.</p>
 </main>
 
-<section id="deck" hidden>
-  <div class="bar">
-    <button class="btn ghost" id="backBtn" type="button">← 다른 파일</button>
-    <select id="range" aria-label="분석 기간"></select>
+<div id="result" hidden>
+  <div class="top"><div class="logo sm" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 38 38"><path d="M6 17.5c0-5.8 5.8-10 13-10s13 4.2 13 10-5.8 10-13 10c-1.4 0-2.8-.2-4.1-.5L8 30l1.4-5.6C7.3 22.6 6 20.2 6 17.5z" fill="#4E5FE6"/></svg></div>단톡 리캡<span class="grow"></span><button class="btn line" id="backBtn" type="button">다른 파일 올리기</button></div>
+  <div class="toolbar">
+    <div class="seg" id="rangeSeg" role="group" aria-label="분석 기간"></div>
+    <span class="sp"></span>
     <label for="mask"><input type="checkbox" id="mask"> 이름 가리기</label>
     <label for="quote"><input type="checkbox" id="quote" checked> 명대사 인용</label>
+    <button class="btn line" id="memberBtn" type="button" aria-expanded="false">멤버 관리</button>
   </div>
-  <div class="stage" id="stage">
-    <div class="progress" id="progress"></div>
-    <div id="cardHost"></div>
-    <div class="tap l" id="tapL" aria-hidden="true"></div>
-    <div class="tap r" id="tapR" aria-hidden="true"></div>
-  </div>
-  <div class="controls">
-    <button class="btn ghost round" id="prev" type="button" aria-label="이전 카드">‹</button>
-    <span class="count" id="count">1 / 8</span>
-    <button class="btn ghost round" id="next" type="button" aria-label="다음 카드">›</button>
-    <button class="btn" id="saveBtn" type="button">이미지로 저장</button>
-  </div>
-  <div class="meta" id="meta"></div>
-  <details class="diag" id="diag"></details>
-</section>
+  <section class="panel wide members" id="members" hidden></section>
+  <div class="head" id="head"></div>
+  <div class="grid" id="grid"></div>
+</div>
 
 <div class="modal" id="modal" hidden>
-  <img id="modalImg" alt="저장할 Recap 카드 이미지">
+  <img id="modalImg" alt="저장할 결과 이미지">
   <p>이미지를 길게 누르거나(모바일) 우클릭해 저장·공유하세요.</p>
   <button class="btn" id="closeModal" type="button">닫기</button>
 </div>
@@ -375,13 +372,18 @@ const LAUGH = /ㅋ{2,}|ㅎ{3,}|ㅋㅌ|크크|킄킄|😂|🤣/u;
 const laughOnly = s => s.replace(/[ㅋㅎㅌㄱㄲㅠㅜ\s.,!?~ㅡ]/g,'').replace(/[😂🤣\u200d\ufe0f]/gu,'')==='';
 const MIN = 60000;
 
+
+/* ====================================================================
+   3. 분석
+   ==================================================================== */
+const BOT_RE = /(봇|bot|gpt|chat\s?gpt|오늘학교|알리미|알림이|클로바|clova|gemini|claude|빅스비|notification)/i;
+
 function buildRanges(msgs){
   const years = {}; for(const m of msgs) years[m.y]=(years[m.y]||0)+1;
-  const out = Object.keys(years).sort((a,b)=>b-a).map(y=>({key:'y'+y,label:`${y}년 (${years[y].toLocaleString('ko-KR')}개)`,from:new Date(+y,0,1).getTime(),to:new Date(+y+1,0,1).getTime(),year:+y}));
+  const out = Object.keys(years).sort((a,b)=>b-a).slice(0,4).map(y=>({key:'y'+y,label:`${y}`,from:new Date(+y,0,1).getTime(),to:new Date(+y+1,0,1).getTime(),year:+y}));
   if(msgs.length){
     const last = msgs[msgs.length-1].t, d=new Date(last);
-    const from = new Date(d.getFullYear()-1,d.getMonth(),d.getDate()+1).getTime();
-    out.push({key:'r12',label:'최근 12개월',from,to:last+1,year:null});
+    out.push({key:'r12',label:'최근 12개월',from:new Date(d.getFullYear()-1,d.getMonth(),d.getDate()+1).getTime(),to:last+1,year:null});
   }
   return out;
 }
@@ -392,37 +394,53 @@ function defaultRange(ranges,msgs){
   return ranges.find(r=>r.year)||ranges[0];
 }
 
-function analyze(all, range){
-  const msgs = all.filter(m=>m.t>=range.from && m.t<range.to && m.name);
+function analyze(all, range, excl){
+  const msgs = all.filter(m=>m.t>=range.from && m.t<range.to && m.name && !excl.has(m.name));
   const N = msgs.length;
   const P = new Map();
-  const person = n => { let p=P.get(n); if(!p){ p={name:n,count:0,media:0,emoticon:0,night:0,h3:0,nightDays:new Set(),words:new Map(),wordTotal:0,first:Infinity,last:0,laughRecv:0,delays:[],closer:0}; P.set(n,p);} return p; };
-  const hours = new Array(24).fill(0), byDay=new Map(), months=new Array(12).fill(0);
-  const words = new Map(); let wordTotal=0;
-  for(const m of msgs){
-    const p=person(m.name); p.count++; p.first=Math.min(p.first,m.t); p.last=Math.max(p.last,m.t);
+  const person = n => { let p=P.get(n); if(!p){ p={name:n,count:0,text:0,chars:0,q:0,media:0,emoticon:0,del:0,night:0,h3:0,nightDays:new Set(),
+    words:new Map(),wordTotal:0,first:Infinity,last:0,laughRecv:0,delays:[],closer:0,starts:0,streak:0,streakAt:0}; P.set(n,p);} return p; };
+  const hours=new Array(24).fill(0), months=new Array(12).fill(0), byDay=new Map();
+  const heat=Array.from({length:7},()=>new Array(24).fill(0));
+  const words=new Map(); let wordTotal=0;
+  const pairs=new Map();
+  let run=null;
+  for(let i=0;i<N;i++){
+    const m=msgs[i], p=person(m.name);
+    p.count++; p.first=Math.min(p.first,m.t); p.last=Math.max(p.last,m.t);
     hours[m.h]++; months[m.mo-1]++;
+    heat[(new Date(m.t).getDay()+6)%7][m.h]++;
     const dk=`${m.y}-${m.mo}-${m.d}`; byDay.set(dk,(byDay.get(dk)||0)+1);
     if(m.kind==='media') p.media++;
     if(m.kind==='emoticon') p.emoticon++;
+    if(m.kind==='deleted') p.del++;
     if(m.h>=2 && m.h<5){ p.night++; p.nightDays.add(dk); }
     if(m.h===3) p.h3++;
     if(m.kind==='text'){
+      p.text++; p.chars+=m.text.trim().length;
+      if(/[?？]/.test(m.text)) p.q++;
       for(const w of tokens(m.text)){ words.set(w,(words.get(w)||0)+1); wordTotal++; p.words.set(w,(p.words.get(w)||0)+1); p.wordTotal++; }
+    }
+    const prev=msgs[i-1];
+    if(prev && prev.name===m.name && m.t-prev.t<=10*MIN){ run.n++; }
+    else run={name:m.name,n:1,t:m.t};
+    if(run.n>p.streak){ p.streak=run.n; p.streakAt=run.t; }
+    if(prev && prev.name!==m.name && m.t-prev.t<=10*MIN){
+      const k=[prev.name,m.name].sort().join('\u0001'); pairs.set(k,(pairs.get(k)||0)+1);
     }
   }
   const people=[...P.values()].sort((a,b)=>b.count-a.count);
 
-  // 웃음 반응: ㅋㅋ 메시지 → 5분 안의 직전 '다른 사람' 메시지(웃음만 있는 메시지는 건너뜀)에 크레딧
-  const credited = new Map(); // idx -> Set(reactor)
-  for(let i=1;i<msgs.length;i++){
+  // 웃음 반응
+  const credited=new Map(); let laughTotal=0;
+  for(let i=1;i<N;i++){
     const m=msgs[i]; if(m.kind!=='text' || !LAUGH.test(m.text)) continue;
     for(let j=i-1;j>=0 && m.t-msgs[j].t<=5*MIN;j--){
       const o=msgs[j];
       if(o.name===m.name) continue;
       if(o.kind==='text' && laughOnly(o.text)) continue;
       let s=credited.get(j); if(!s){s=new Set();credited.set(j,s);}
-      if(!s.has(m.name)){ s.add(m.name); P.get(o.name).laughRecv++; }
+      if(!s.has(m.name)){ s.add(m.name); P.get(o.name).laughRecv++; laughTotal++; }
       break;
     }
   }
@@ -432,298 +450,318 @@ function analyze(all, range){
     if(!bestLine || s.size>bestLine.n || (s.size===bestLine.n && o.text.length<bestLine.m.text.length)) bestLine={m:o,n:s.size};
   }
 
-  // 대화 세션(1시간 공백 기준) → 읽씹/답장 속도/대화 종결자
+  // 대화 세션(1시간 공백)
   const sessions=[]; let s=null, prev=null;
   for(const m of msgs){
-    if(!s || m.t-s.end>60*MIN){ s={start:m.t,end:m.t,sp:new Set(),n:0,last:null}; sessions.push(s); }
+    if(!s || m.t-s.end>60*MIN){ s={start:m.t,end:m.t,sp:new Set(),n:0,first:m.name,last:null}; sessions.push(s); }
     s.sp.add(m.name); s.n++; s.end=m.t; s.last=m.name;
     if(prev && prev.name!==m.name && m.t-prev.t<12*60*MIN) P.get(m.name).delays.push((m.t-prev.t)/MIN);
     prev=m;
   }
-  const active = sessions.filter(x=>x.sp.size>=2 && x.n>=5);
-  for(const x of active) P.get(x.last).closer++;
-  const minMsgs = Math.max(20, Math.round(N*0.01));
-  const seen = people.filter(p=>p.count>=minMsgs).map(p=>{
-    const elig = active.filter(x=>x.start>=p.first && x.start<=p.last);
-    const silent = elig.filter(x=>!x.sp.has(p.name)).length;
-    const d=[...p.delays].sort((a,b)=>a-b);
-    return {p, elig:elig.length, silent, rate: elig.length? silent/elig.length : 0, median: d.length? d[Math.floor(d.length/2)] : null};
-  }).filter(x=>x.elig>=8).sort((a,b)=>b.rate-a.rate || (b.median||0)-(a.median||0));
+  const active=sessions.filter(x=>x.sp.size>=2 && x.n>=5);
+  for(const x of active){ P.get(x.last).closer++; P.get(x.first).starts++; }
+  const minMsgs=Math.max(20,Math.round(N*0.01));
+  const median=a=>{ if(!a.length) return null; const d=[...a].sort((x,y)=>x-y); return d[Math.floor(d.length/2)]; };
+  const seen=people.filter(p=>p.count>=minMsgs).map(p=>{
+    const elig=active.filter(x=>x.start>=p.first && x.start<=p.last);
+    const silent=elig.filter(x=>!x.sp.has(p.name)).length;
+    return {p,elig:elig.length,silent,rate:elig.length?silent/elig.length:0,median:median(p.delays)};
+  }).filter(x=>x.elig>=8).sort((a,b)=>b.rate-a.rate);
 
-  // 멤버별 입버릇: 본인 빈도 / 전체 빈도 비율이 가장 높은 단어
-  const habit = p => {
+  // 입버릇
+  for(const p of people){
     let best=null;
-    for(const [w,c] of p.words){ if(c<4) continue; const sc=(c/p.wordTotal)/((words.get(w))/wordTotal) * Math.log(1+c); if(!best||sc>best.sc) best={w,c,sc}; }
-    return best;
-  };
+    for(const [w,c] of p.words){ if(c<3) continue; const sc=(c/p.wordTotal)/(words.get(w)/wordTotal)*Math.log(1+c); if(!best||sc>best.sc) best={w,c,sc}; }
+    p.habit=best;
+  }
 
+  // 단톡 화력 지수(각 20점)
   const days=[...byDay.entries()].sort((a,b)=>b[1]-a[1]);
   const first=msgs[0], last=msgs[N-1];
-  const spanDays = N? Math.max(1,Math.round((new Date(last.y,last.mo-1,last.d)-new Date(first.y,first.mo-1,first.d))/864e5)+1) : 0;
-  return {
-    N, range, people, hours, months, byDay, days, spanDays,
-    activeDays: byDay.size,
-    topWords:[...words.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12),
-    habits: people.slice(0,4).map(p=>({name:p.name,h:habit(p)})).filter(x=>x.h),
-    owls:[...people].filter(p=>p.night>0).sort((a,b)=>b.night-a.night),
-    nightTotal: hours[2]+hours[3]+hours[4],
-    laughers:[...people].filter(p=>p.laughRecv>0).sort((a,b)=>b.laughRecv-a.laughRecv),
-    bestLine, seen,
-    closers:[...people].filter(p=>p.closer>0).sort((a,b)=>b.closer-a.closer),
-    emoKing:[...people].filter(p=>p.emoticon>0).sort((a,b)=>b.emoticon-a.emoticon)[0]||null,
-    sessions:active.length
-  };
+  const spanDays=N?Math.max(1,Math.round((new Date(last.y,last.mo-1,last.d)-new Date(first.y,first.mo-1,first.d))/864e5)+1):0;
+  const perDay=N/Math.max(1,byDay.size);
+  const counts=people.map(p=>p.count).sort((a,b)=>a-b), n=counts.length;
+  const gini=n>1? counts.reduce((acc,x,i)=>acc+(2*(i+1)-n-1)*x,0)/(n*counts.reduce((a,b)=>a+b,0)) : 1;
+  const nightShare=N?(hours[0]+hours[1]+hours[2]+hours[3]+hours[4])/N:0;
+  const clamp=v=>Math.max(0,Math.min(20,v));
+  const factors=[
+    {k:'활동일',v:clamp(20*byDay.size/Math.max(1,spanDays)),d:`${fmtN(byDay.size)}/${fmtN(spanDays)}일 대화`},
+    {k:'대화량',v:clamp(20*Math.log10(1+perDay)/Math.log10(201)),d:`대화한 날 평균 ${fmtN(perDay)}개`},
+    {k:'웃음',v:clamp(20*(laughTotal/Math.max(1,N))/0.15),d:`메시지 100개당 ㅋㅋ ${(100*laughTotal/Math.max(1,N)).toFixed(1)}번`},
+    {k:'참여 균형',v:clamp(20*(1-gini)),d:`지니계수 ${gini.toFixed(2)}`},
+    {k:'야행성',v:clamp(20*nightShare/0.08),d:`0–5시 비중 ${(100*nightShare).toFixed(1)}%`}
+  ];
+  const score=factors.reduce((a,f)=>a+f.v,0);
+
+  return {N,range,people,hours,months,heat,byDay,days,spanDays,activeDays:byDay.size,perDay,
+    topWords:[...words.entries()].sort((a,b)=>b[1]-a[1]).slice(0,24),
+    owls:people.filter(p=>p.night>0).sort((a,b)=>b.night-a.night),
+    nightTotal:hours[2]+hours[3]+hours[4],
+    laughers:people.filter(p=>p.laughRecv>0).sort((a,b)=>b.laughRecv-a.laughRecv),
+    laughTotal,bestLine,seen,sessions:active.length,
+    pairs:[...pairs.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,c])=>({a:k.split('\u0001')[0],b:k.split('\u0001')[1],c})),
+    factors,score};
 }
 
 /* ====================================================================
-   4. 카드 렌더링
+   4. 렌더링
    ==================================================================== */
-const state = {data:null, ranges:[], range:null, A:null, idx:0, mask:false, quote:true, sample:false, alias:new Map(), me:''};
-const fmtN = n => Math.round(n).toLocaleString('ko-KR');
-const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const state={data:null,ranges:[],range:null,A:null,mask:false,quote:true,sample:false,alias:new Map(),excl:new Set(),me:'',fileName:''};
+const $=s=>document.querySelector(s);
+const fmtN=n=>Math.round(n).toLocaleString('ko-KR');
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function nm(n){ if(!state.mask) return esc(n); const a=[...n]; if(a.length<=1) return esc(n); if(a.length===2) return esc(a[0]+'*'); return esc(a[0]+'*'.repeat(a.length-2)+a[a.length-1]); }
-const heroCls = n => { const l=[...n].length; return l>9?'sm': l>5?'mid':''; };
-function maskText(t){ if(!state.mask||!state.A) return t; let out=t; for(const p of state.A.people){ if(p.name.length>1) out=out.split(p.name).join([...p.name][0]+'*'.repeat([...p.name].length-1)); } return out; }
-function dur(min){ if(min==null) return '-'; if(min<1) return '1분 미만'; if(min<60) return `${Math.round(min)}분`; return `${(min/60).toFixed(1)}시간`; }
-const label = () => state.range.year ? `${state.range.year}` : '최근 12개월';
-const roomName = () => state.data.room || '우리 단톡방';
-function foot(n){ return `<div class="k-foot"><span>TALK RECAP · ${esc(label())}</span><span>${n}</span></div>`; }
-function blob(css){ return `<div class="blob" style="${css}"></div>`; }
-function ranking(list, val, max){
-  return `<div class="k-rank">${list.map((p,i)=>`<div class="r"><span class="n">${i+1}</span><span class="nm">${nm(p.name)}</span><span class="v">${val(p)}</span><div class="track"><i style="width:${Math.max(3,max?(i===0?100:100*p._v/max):0)}%"></i></div></div>`).join('')}</div>`;
-}
-function bars(arr, hi, color){
-  const mx=Math.max(1,...arr);
-  return `<div class="k-bars" style="color:${color||'currentColor'}">${arr.map((v,i)=>`<i class="${hi(i)?'hi':''}" style="height:${Math.max(2,100*v/mx)}%"></i>`).join('')}</div>`;
-}
-function meLine(A,key,txt,shown){
-  if(!state.me) return '';
-  const list=[...A.people].sort((a,b)=>key(b)-key(a)); const i=list.findIndex(p=>p.name===state.me);
-  if(i<0 || i<shown) return '';
-  return `<div class="k-note" style="margin-top:2.4cqw;opacity:1;font-weight:700">나(${nm(state.me)}) · ${txt(list[i],i+1)}</div>`;
-}
-function empty(cls,eyebrow,title,msg,n){ return `<div class="card ${cls}"><div class="k-eyebrow">${eyebrow}</div><div class="k-title">${title}</div><div class="k-sub" style="margin-top:6cqw">${msg}</div>${foot(n)}</div>`; }
+function maskText(t){ if(!state.mask||!state.A) return t; let out=t; for(const p of state.A.people){ const a=[...p.name]; if(a.length>1) out=out.split(p.name).join(a[0]+'*'.repeat(a.length-1)); } return out; }
+const dur=min=>min==null?'-':min<1?'1분 미만':min<60?`${Math.round(min)}분`:`${(min/60).toFixed(1)}시간`;
+const periodLabel=()=>state.range.year?`${state.range.year}년`:'최근 12개월';
+const roomName=()=>state.data.room||'우리 단톡방';
+const meCls=n=>n===state.me?'me':'';
 
-function cards(){
-  const A=state.A, T=A.people[0];
-  const list=[];
-  // 1. 인트로
-  list.push(`<div class="card c-intro">${blob('width:90cqw;height:90cqw;right:-38cqw;top:-30cqw;background:#FFE04A;opacity:.95')}${blob('width:40cqw;height:40cqw;left:-14cqw;bottom:18cqw;background:#FF5B4A;opacity:.9')}
-    <div class="k-eyebrow" style="color:var(--sun)">${esc(label())} Recap</div>
-    <div class="k-title" style="margin-top:22cqw;overflow-wrap:anywhere">${esc(roomName())}의<br>${state.range.year?esc(label())+'년':'지난 1년'}</div>
-    <div class="k-sub">우리는 <span style="color:var(--sun)">${fmtN(A.N)}개</span>의 메시지를 주고받았어요</div>
-    <div class="k-grid">
-      <div class="k-stat"><b>${fmtN(A.activeDays)}일</b><span>대화가 있었던 날 / ${fmtN(A.spanDays)}일</span></div>
-      <div class="k-stat"><b>${fmtN(A.people.length)}명</b><span>말을 한 멤버</span></div>
-      <div class="k-stat"><b>${fmtN(A.N/Math.max(1,A.activeDays))}개</b><span>대화한 날 하루 평균</span></div>
-      <div class="k-stat"><b>${fmtN(A.sessions)}번</b><span>활발했던 대화</span></div>
-    </div>${foot('01')}</div>`);
-  // 2. 수다왕
-  const top5=A.people.slice(0,5); top5.forEach(p=>p._v=p.count);
-  list.push(`<div class="card c-talk">${blob('width:70cqw;height:70cqw;right:-26cqw;top:-22cqw;background:#16132C;opacity:.12')}
-    <div class="k-eyebrow">올해 가장 말 많은 사람</div>
-    <div class="k-hero ${heroCls(T.name)}" style="margin-top:8cqw">${nm(T.name)}</div>
-    <div class="k-sub">${fmtN(T.count)}개 · 전체 대화의 ${(100*T.count/A.N).toFixed(1)}%</div>
-    <div class="k-note">대화한 날마다 평균 ${(T.count/Math.max(1,A.activeDays)).toFixed(1)}개씩. 이 방의 공기는 이 사람이 채웠습니다.</div>
-    <div style="margin-top:auto">${ranking(top5,p=>fmtN(p.count),T.count)}${meLine(A,p=>p.count,(p,r)=>`${r}위 · ${fmtN(p.count)}개 (${(100*p.count/A.N).toFixed(1)}%)`,5)}</div>${foot('02')}</div>`);
-  // 3. 가장 뜨거운 날
-  const [dk,dc]=A.days[0]; const [yy,mm,dd]=dk.split('-').map(Number); const wd='일월화수목금토'[new Date(yy,mm-1,dd).getDay()];
-  const peakM = A.months.indexOf(Math.max(...A.months));
-  list.push(`<div class="card c-day">${blob('width:60cqw;height:60cqw;left:-20cqw;top:-18cqw;background:#FFE04A;opacity:.7')}
-    <div class="k-eyebrow">가장 뜨거웠던 날</div>
-    <div class="k-hero mid" style="margin-top:8cqw">${mm}월 ${dd}일<span style="font-size:.5em"> ${wd}</span></div>
-    <div class="k-sub">하루에만 ${fmtN(dc)}개의 메시지</div>
-    <div class="k-note">평소(대화한 날 평균 ${fmtN(A.N/Math.max(1,A.activeDays))}개)의 ${(dc/Math.max(1,A.N/A.activeDays)).toFixed(1)}배. 그날 무슨 일이 있었는지 다들 기억하시죠?</div>
-    <div style="margin-top:auto"><div class="k-note" style="margin-bottom:2cqw">월별 메시지 · 최다 ${peakM+1}월</div>${bars(A.months,i=>i===peakM)}<div class="k-axis" style="margin-top:1cqw"><span>1월</span><span>6월</span><span>12월</span></div></div>${foot('03')}</div>`);
-  // 4. 올해의 단어
+function panel(key,title,sub,body,wide){
+  return `<section class="panel${wide?' wide':''}" data-key="${key}"><header><h3>${title}</h3>${sub?`<small>${sub}</small>`:''}<button class="ico noexp" type="button" data-save="${key}">이미지 저장</button></header>${body}
+  <div class="exp-only"><span>단톡 리캡 · ${esc(roomName())}</span><span>${esc(periodLabel())}</span></div></section>`;
+}
+function rankList(list,val,label){
+  const mx=Math.max(1,...list.map(val));
+  return `<ol class="rank">${list.map((p,i)=>`<li class="${meCls(p.name)}"><span class="n num">${i+1}</span><span class="nm">${nm(p.name)}${p.name===state.me?' (나)':''}</span><span class="bar"><i style="width:${Math.max(1.5,100*val(p)/mx)}%"></i></span><span class="v num">${label(p)}</span></li>`).join('')}</ol>`;
+}
+function barsSvg(arr,hi,labels){
+  const W=520,H=150,pad=22,mx=Math.max(1,...arr),bw=(W-pad*2)/arr.length;
+  let g=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="막대 그래프">`;
+  g+=`<line x1="${pad}" x2="${W-pad}" y1="${H-24}" y2="${H-24}" stroke="#E6E8EE"/>`;
+  arr.forEach((v,i)=>{ const h=Math.max(1.5,(H-40)*v/mx); g+=`<rect x="${pad+i*bw+bw*.15}" y="${H-24-h}" width="${bw*.7}" height="${h}" rx="2" fill="${hi(i)?'#4E5FE6':'#C9CFF7'}"/>`; });
+  labels.forEach(([i,t])=>{ g+=`<text x="${pad+i*bw+bw/2}" y="${H-8}" font-size="11" text-anchor="middle" fill="#9AA0AE">${t}</text>`; });
+  return g+'</svg>';
+}
+function gaugeSvg(score){
+  const cx=130,cy=128,r=96, pt=(v,rr)=>[cx-rr*Math.cos(Math.PI*v/100), cy-rr*Math.sin(Math.PI*v/100)];
+  const soft=['#CFE8D6','#F8E6BF','#F8D3C2','#F5C9CB'], strong=['#2E9E4F','#E39B1B','#E8743B','#E5484D'];
+  const seg=Math.min(3,Math.floor(score/25));
+  let g=`<svg viewBox="0 0 260 150" width="100%" style="max-width:320px" role="img" aria-label="단톡 화력 지수 ${score.toFixed(1)}점">`;
+  for(let i=0;i<4;i++){ const [x0,y0]=pt(i*25+1.2,r),[x1,y1]=pt(i*25+23.8,r); g+=`<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}" fill="none" stroke="${soft[i]}" stroke-width="24"/>`; }
+  const [sx,sy]=pt(Math.max(1.2,Math.min(98.8,score)),r); const [nx,ny]=pt(score,r-26);
+  g+=`<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="12" fill="${strong[seg]}"/>`;
+  g+=`<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="#1A1C22" stroke-width="3" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="6" fill="#1A1C22"/>`;
+  return {svg:g+'</svg>',color:strong[seg],label:['잔잔한 방','훈훈한 방','뜨거운 방','불타는 방'][seg]};
+}
+function radarSvg(f){
+  const cx=160,cy=128,R=88, ang=i=>(-90+i*72)*Math.PI/180, P=(i,v)=>[cx+R*v/20*Math.cos(ang(i)), cy+R*v/20*Math.sin(ang(i))];
+  let g=`<svg viewBox="0 0 320 250" width="100%" style="max-width:380px" role="img" aria-label="지표별 점수 레이더 차트">`;
+  for(const lv of [5,10,15,20]){ g+=`<polygon points="${f.map((_,i)=>P(i,lv).map(x=>x.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#E6E8EE"/>`; g+=`<text x="${cx+3}" y="${(cy-R*lv/20+3).toFixed(1)}" font-size="8.5" fill="#B4B9C5">${lv}</text>`; }
+  f.forEach((_,i)=>{ const [x,y]=P(i,20); g+=`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#EEF0F4"/>`; });
+  g+=`<polygon points="${f.map((x,i)=>P(i,Math.max(.6,x.v)).map(v=>v.toFixed(1)).join(',')).join(' ')}" fill="rgba(78,95,230,.18)" stroke="#4E5FE6" stroke-width="2" stroke-linejoin="round"/>`;
+  f.forEach((x,i)=>{ const [px,py]=P(i,24.5); const a=Math.abs(px-cx)<8?'middle':px>cx?'start':'end'; g+=`<text x="${px.toFixed(1)}" y="${(py+4).toFixed(1)}" font-size="11.5" text-anchor="${a}" fill="#5F6472">${x.k}</text>`; });
+  return g+'</svg>';
+}
+
+function renderHead(){
+  const A=state.A; const [dk,dc]=A.days[0]||['',0]; const [y,m,d]=dk.split('-');
+  const peakH=A.hours.indexOf(Math.max(...A.hours));
+  $('#head').innerHTML=`<div><h2>${esc(roomName())}<small>${esc(periodLabel())} · ${esc(state.data.format)}</small></h2>
+    <div class="big num">${fmtN(A.N)}개<em>메시지 · 멤버 ${fmtN(A.people.length)}명</em></div></div>
+    <div class="info"><b>가장 뜨거웠던 날</b>${dk?`${+m}월 ${+d}일 · ${fmtN(dc)}개 (평소의 ${(dc/Math.max(1,A.perDay)).toFixed(1)}배)`:'-'}</div>
+    <div class="info"><b>가장 활발한 시간</b>${peakH}시대 · 대화한 날 ${fmtN(A.activeDays)}일</div>
+    <span class="sp"></span>`;
+}
+
+function renderGrid(){
+  const A=state.A, out=[];
+  if(!A.N){ $('#grid').innerHTML=`<section class="panel wide"><p>이 기간에 분석할 메시지가 없습니다. 다른 기간을 고르거나 멤버 관리에서 제외한 멤버를 확인해주세요.</p></section>`; return; }
+  // 화력 지수 (게이지 + 레이더)
+  const G=gaugeSvg(A.score);
+  out.push(panel('fire','단톡 화력 지수','5개 지표 합산',`<div class="gauge-wrap">${G.svg}<div class="gauge-score num" style="color:${G.color}">${A.score.toFixed(1)}<small>/100</small></div>
+    <span class="pill" style="background:${G.color}">${G.label}</span>
+    <p class="who-sub" style="margin:0">${A.score>=75?'하루도 조용할 날이 없는 방입니다.':A.score>=50?'꾸준히 떠들고 자주 웃는 방입니다.':A.score>=25?'필요할 때 모여 떠드는 방입니다.':'조용히 소식을 나누는 방입니다.'}</p></div>`));
+  out.push(panel('factors','지표별 점수','각 20점 만점',`<div style="text-align:center">${radarSvg(A.factors)}</div>
+    <ul class="factor">${[...A.factors].sort((a,b)=>a.v-b.v).map(f=>`<li><span>${f.k}</span><span class="bar"><i style="width:${100*f.v/20}%"></i></span><b>${f.v.toFixed(1)}</b></li>`).join('')}</ul>
+    <p class="note">${A.factors.map(f=>`${f.k}: ${f.d}`).join(' · ')}</p>`));
+  // 수다왕 (전원)
+  const T=A.people[0];
+  out.push(panel('talk','올해 가장 말 많은 사람',`전체 ${A.people.length}명`,`<div class="who">${nm(T.name)}</div>
+    <div class="who-sub">${fmtN(T.count)}개 · 전체의 ${(100*T.count/A.N).toFixed(1)}% · 대화한 날마다 ${(T.count/Math.max(1,A.activeDays)).toFixed(1)}개</div>
+    ${rankList(A.people,p=>p.count,p=>`${fmtN(p.count)}<small>${(100*p.count/A.N).toFixed(1)}%</small>`)}`));
+  // 입버릇 (전원)
+  out.push(panel('habit','멤버별 입버릇','그 사람이 유독 자주 쓰는 단어',`<ul class="habits">${A.people.map(p=>`<li class="${meCls(p.name)}"><div class="nm">${nm(p.name)}</div><div class="w">${p.habit?`“${esc(p.habit.w)}”<small>${fmtN(p.habit.c)}회</small>`:'<small style="margin:0">단어 부족</small>'}</div></li>`).join('')}</ul>`));
+  // 올해의 단어
   if(A.topWords.length){
     const [w0,c0]=A.topWords[0];
-    list.push(`<div class="card c-word">${blob('width:80cqw;height:80cqw;right:-34cqw;bottom:-20cqw;background:#16132C;opacity:.08')}
-      <div class="k-eyebrow">올해 가장 많이 쓴 단어</div>
-      <div class="k-hero ${heroCls(w0)}" style="margin-top:6cqw">“${esc(w0)}”</div>
-      <div class="k-sub">${fmtN(c0)}번 등장</div>
-      <div class="k-chips">${A.topWords.slice(1,11).map(([w,c])=>`<span>${esc(w)}<em>${fmtN(c)}</em></span>`).join('')}</div>
-      ${A.habits.length?`<div style="margin-top:auto"><div class="k-note" style="margin-bottom:1.6cqw">멤버별 입버릇</div><div class="k-rank">${A.habits.map(h=>`<div class="r" style="grid-template-columns:minmax(0,1fr) auto"><span class="nm">${nm(h.name)}</span><span class="v">“${esc(h.h.w)}” ${fmtN(h.h.c)}회</span></div>`).join('')}</div></div>`:''}
-      ${foot('04')}</div>`);
-  } else list.push(empty('c-word','올해 가장 많이 쓴 단어','단어가 부족해요','텍스트 메시지가 너무 적어 단어를 집계하지 못했습니다.','04'));
-  // 5. 새벽 3시
+    out.push(panel('words','올해 가장 많이 쓴 단어',`상위 ${A.topWords.length}개`,`<div class="words">${A.topWords.map(([w,c],i)=>`<span class="${i===0?'t1':i<4?'t2':''}">${esc(w)}<small class="num">${fmtN(c)}</small></span>`).join('')}</div>
+      <p class="note">“${esc(w0)}”는 올해 ${fmtN(c0)}번, 대화한 날 하루 평균 ${(c0/Math.max(1,A.activeDays)).toFixed(1)}번 나왔습니다. 조사·ㅋㅋ·링크·파일 이름은 제외했습니다.</p>`));
+  }
+  // 웃음 제조기
+  if(A.laughers.length){
+    const f=A.laughers[0], q=A.bestLine;
+    out.push(panel('laugh','가장 많이 웃긴 사람','ㅋㅋ 반응 기준',`<div class="who">${nm(f.name)}</div>
+      <div class="who-sub">ㅋㅋ 반응 ${fmtN(f.laughRecv)}번 · 메시지 ${fmtN(f.count)}개 중 ${(100*f.laughRecv/Math.max(1,f.count)).toFixed(1)}%가 누군가를 웃김</div>
+      ${state.quote&&q?`<div class="quote">“${esc(maskText(q.m.text.trim()).slice(0,90))}${q.m.text.trim().length>90?'…':''}”<small>올해의 빵 터진 한마디 · ${nm(q.m.name)} · ${q.n}명이 ㅋㅋ</small></div>`:''}
+      ${rankList(A.laughers.slice(0,8),p=>p.laughRecv,p=>`${fmtN(p.laughRecv)}회`)}`));
+  }
+  // 새벽 출몰
   const owl=A.owls[0];
-  if(owl){
-    list.push(`<div class="card c-night">${blob('width:22cqw;height:22cqw;right:9cqw;top:14cqw;background:#F3E7C0;box-shadow:0 0 14cqw rgba(243,231,192,.45)')}${blob('width:19cqw;height:19cqw;right:4cqw;top:10cqw;background:#0F1D45')}
-      <div class="k-eyebrow">새벽 3시 출몰 빈도</div>
-      <div class="k-title" style="margin-top:22cqw">모두가 잠든 시간,<br>깨어 있던 사람</div>
-      <div class="k-hero ${heroCls(owl.name)}">${nm(owl.name)}</div>
-      <div class="k-grid">
-        <div class="k-stat"><b>${fmtN(owl.nightDays.size)}일 밤</b><span>새벽 2–5시 출몰</span></div>
-        <div class="k-stat"><b>${fmtN(owl.h3)}개</b><span>정확히 3시대 메시지</span></div>
-      </div>
-      <div style="margin-top:auto"><div class="k-note" style="margin-bottom:2cqw">시간대별 방 전체 메시지 · 새벽 2–5시 ${fmtN(A.nightTotal)}개</div>${bars(A.hours,i=>i>=2&&i<5,'#F3E7C0')}<div class="k-axis" style="margin-top:1cqw"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div></div>${foot('05')}</div>`);
-  } else list.push(empty('c-night','새벽 3시 출몰 빈도','이 방은 다들<br>잘 자요','새벽 2–5시에 온 메시지가 한 개도 없습니다. 건강한 단톡방 인정.','05'));
-  // 6. 웃음 제조기
-  const fun=A.laughers[0];
-  if(fun){
-    const top3=A.laughers.slice(0,3); top3.forEach(p=>p._v=p.laughRecv);
-    const q=A.bestLine;
-    list.push(`<div class="card c-laugh">${blob('width:64cqw;height:64cqw;left:-24cqw;top:-24cqw;background:#FFE04A;opacity:.6')}
-      <div class="k-eyebrow">가장 많이 웃긴 사람</div>
-      <div class="k-hero ${heroCls(fun.name)}" style="margin-top:8cqw">${nm(fun.name)}</div>
-      <div class="k-sub">ㅋㅋ 반응 ${fmtN(fun.laughRecv)}번 받음</div>
-      <div class="k-note">메시지 ${fmtN(fun.count)}개 중 ${(100*fun.laughRecv/Math.max(1,fun.count)).toFixed(1)}%가 누군가를 웃겼습니다.</div>
-      ${state.quote&&q?`<div class="k-quote">“${esc(maskText(q.m.text.trim()).slice(0,70))}${q.m.text.trim().length>70?'…':''}”<small>올해의 빵 터진 한마디 · ${nm(q.m.name)} · ${q.n}명이 ㅋㅋ</small></div>`:''}
-      <div style="margin-top:auto">${ranking(top3,p=>fmtN(p.laughRecv)+'회',fun.laughRecv)}</div>${foot('06')}</div>`);
-  } else list.push(empty('c-laugh','가장 많이 웃긴 사람','웃음이 없는 방…?','ㅋㅋ 반응을 찾지 못했습니다.','06'));
-  // 7. 읽씹왕
-  const sk=A.seen[0];
-  if(sk){
-    const cl=A.closers[0];
-    list.push(`<div class="card c-seen">${blob('width:58cqw;height:58cqw;right:-18cqw;top:-14cqw;background:#FF94CA;opacity:.9')}
-      <div class="k-eyebrow">올해의 읽씹왕</div>
-      <div class="k-hero ${heroCls(sk.p.name)}" style="margin-top:12cqw">${nm(sk.p.name)}</div>
-      <div class="k-sub">활발한 대화 ${fmtN(sk.elig)}번 중 ${fmtN(sk.silent)}번 침묵</div>
-      <div class="k-grid">
-        <div class="k-stat"><b>${Math.round(sk.rate*100)}%</b><span>침묵률</span></div>
-        <div class="k-stat"><b>${dur(sk.median)}</b><span>답장까지 걸린 시간(중앙값)</span></div>
-      </div>
-      ${cl?`<div class="k-note">대화 종결자: <b>${nm(cl.name)}</b> · 대화를 마지막 한마디로 끝낸 횟수 ${fmtN(cl.closer)}번</div>`:''}
-      <div class="k-note" style="margin-top:auto">기준: 1시간 공백으로 대화를 나누고, 2명 이상·5개 이상 오간 대화 가운데 참여하지 않은 비율. 메시지를 한 번도 안 보낸 멤버는 내보내기 파일에 없어 제외됩니다.</div>${foot('07')}</div>`);
-  } else list.push(empty('c-seen','올해의 읽씹왕','판정 불가','멤버별 메시지나 대화 수가 부족해 읽씹왕을 판정하지 못했습니다.','07'));
-  // 8. 요약
+  out.push(panel('night','새벽 3시 출몰 빈도','02:00–04:59',owl?`<div class="who">${nm(owl.name)}</div>
+    <div class="who-sub">${fmtN(owl.nightDays.size)}일 밤 출몰 · 새벽 메시지 ${fmtN(owl.night)}개 · 정확히 3시대 ${fmtN(owl.h3)}개</div>
+    ${barsSvg(A.hours,i=>i>=2&&i<5,[[0,'0시'],[3,'3시'],[6,'6시'],[12,'12시'],[18,'18시'],[23,'23시']])}
+    ${rankList(A.owls.slice(0,5),p=>p.nightDays.size,p=>`${fmtN(p.nightDays.size)}일`)}`:`<div class="who">없음</div><div class="who-sub">새벽 2–5시에 온 메시지가 없습니다. 다들 잘 자는 건강한 방입니다.</div>${barsSvg(A.hours,()=>false,[[0,'0시'],[6,'6시'],[12,'12시'],[18,'18시'],[23,'23시']])}`));
+  // 읽씹왕
+  if(A.seen.length){
+    const sk=A.seen[0];
+    out.push(panel('seen','읽씹왕','활발한 대화 중 침묵 비율',`<div class="who">${nm(sk.p.name)}</div>
+      <div class="who-sub">활발한 대화 ${fmtN(sk.elig)}번 중 ${fmtN(sk.silent)}번 침묵 · 침묵률 ${Math.round(sk.rate*100)}%</div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>멤버</th><th>침묵률</th><th>답장까지(중앙값)</th><th>참여 대화</th></tr></thead><tbody>
+      ${A.seen.map(x=>`<tr class="${meCls(x.p.name)}"><td class="nm">${nm(x.p.name)}</td><td>${Math.round(x.rate*100)}%</td><td>${dur(x.median)}</td><td>${fmtN(x.elig-x.silent)}/${fmtN(x.elig)}</td></tr>`).join('')}
+      </tbody></table></div><p class="note">1시간 공백으로 대화를 나누고 2명 이상·5개 이상 오간 대화 기준. 메시지 ${fmtN(Math.max(20,Math.round(A.N*.01)))}개 이상 멤버만 집계.</p>`));
+  }
+  // 활동 시간표
+  const mx=Math.max(1,...A.heat.flat());
+  out.push(panel('heat','우리 방 활동 시간표','요일 × 시간',`<div class="heat" role="img" aria-label="요일별 시간대 메시지 분포"><span></span>${Array.from({length:24},(_,h)=>`<span>${h%3===0?h:''}</span>`).join('')}
+    ${A.heat.map((row,d)=>`<span>${'월화수목금토일'[d]}</span>${row.map(v=>`<i style="opacity:${(0.05+0.95*v/mx).toFixed(2)}" title="${v}개"></i>`).join('')}`).join('')}</div>
+    <p class="note">가장 진한 칸: ${(()=>{let b=[0,0,0];A.heat.forEach((r,d)=>r.forEach((v,h)=>{if(v>b[0])b=[v,d,h];}));return `${'월화수목금토일'[b[1]]}요일 ${b[2]}시대 (${fmtN(b[0])}개)`;})()}</p>`,true));
+  // 월별 + 짝꿍
+  const pk=A.months.indexOf(Math.max(...A.months));
+  out.push(panel('month','월별 메시지',`최다 ${pk+1}월`,`${barsSvg(A.months,i=>i===pk,A.months.map((_,i)=>[i,`${i+1}`]))}<p class="note">${pk+1}월에 ${fmtN(A.months[pk])}개로 가장 많이 떠들었습니다.</p>`));
+  if(A.pairs.length){
+    const d0=A.pairs[0];
+    out.push(panel('duo','환상의 짝꿍','10분 안에 주고받은 횟수',`<div class="duo">${nm(d0.a)}<i>⇄</i>${nm(d0.b)}</div>
+      <div class="who-sub">올해 ${fmtN(d0.c)}번 주고받음</div>
+      <ol class="rank">${A.pairs.map((x,i)=>`<li><span class="n num">${i+1}</span><span class="nm" style="grid-column:2/4">${nm(x.a)} ⇄ ${nm(x.b)}</span><span class="v num">${fmtN(x.c)}번</span></li>`).join('')}</ol>`));
+  }
+  // 그 밖의 상
+  const pick=(arr,key,fmt,filter)=>{ const c=arr.filter(filter||(p=>key(p)>0)).sort((a,b)=>key(b)-key(a))[0]; return c?{p:c,d:fmt(c)}:null; };
+  const elig=A.people.filter(p=>p.text>=20);
+  const fast=A.seen.filter(x=>x.median!=null&&x.p.delays.length>=10).sort((a,b)=>a.median-b.median)[0];
   const aw=[
-    ['수다왕',T&&nm(T.name)],
-    ['웃음 제조기',fun&&nm(fun.name)],
-    ['새벽 출몰자',owl&&nm(owl.name)],
-    ['읽씹왕',sk&&nm(sk.p.name)],
-    ['이모티콘 장인',A.emoKing&&nm(A.emoKing.name)],
-    ['올해의 단어',A.topWords[0]&&('“'+esc(A.topWords[0][0])+'”')]
-  ].filter(x=>x[1]);
-  list.push(`<div class="card c-sum">${blob('width:70cqw;height:70cqw;left:-30cqw;bottom:-26cqw;background:#3446F2;opacity:.85')}${blob('width:26cqw;height:26cqw;right:-9cqw;top:-9cqw;background:#FF94CA;opacity:.9')}
-    <div class="k-eyebrow" style="color:var(--sun)">${esc(roomName())}</div>
-    <div class="k-hero sm">${esc(label())}${state.range.year?'년':''} 시상식</div>
-    <div class="k-note">메시지 ${fmtN(A.N)}개 · 대화한 날 ${fmtN(A.activeDays)}일 · 멤버 ${fmtN(A.people.length)}명</div>
-    <div class="k-awards" style="margin-top:3cqw">${aw.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
-    ${foot('브라우저에서만 분석됨')}</div>`);
-  // 카드 컨테이너(.card) 안쪽에 내용 래퍼(.in)를 넣어 cqw 단위가 카드 폭 기준으로 계산되게 함
-  return list.map(h=>h.replace(/^(<div class="card [^"]+">)((?:<div class="blob"[^>]*><\/div>)*)/,'$1$2<div class="in">')+'</div>');
+    ['선톡왕','조용한 방을 먼저 깨운 사람',pick(A.people,p=>p.starts,p=>`대화를 연 횟수 ${fmtN(p.starts)}번`)],
+    ['대화 종결자','이 사람이 말하면 대화가 끝남',pick(A.people,p=>p.closer,p=>`마지막 한마디 ${fmtN(p.closer)}번`)],
+    ['답장 스피드왕','누가 말하면 바로 답함',fast?{p:fast.p,d:`답장까지 중앙값 ${dur(fast.median)}`}:null],
+    ['장문왕','한 번에 길게 쓰는 사람',pick(elig,p=>p.chars/p.text,p=>`메시지당 평균 ${(p.chars/p.text).toFixed(1)}자`)],
+    ['질문왕','물음표를 가장 많이 쓴 사람',pick(A.people,p=>p.q,p=>`물음표 메시지 ${fmtN(p.q)}개`)],
+    ['연타왕','혼자 연속으로 보낸 최다 기록',pick(A.people,p=>p.streak,p=>{const d=new Date(p.streakAt);return `${fmtN(p.streak)}연속 · ${d.getMonth()+1}월 ${d.getDate()}일`;})],
+    ['이모티콘 장인','말 대신 이모티콘',pick(A.people,p=>p.emoticon,p=>`이모티콘 ${fmtN(p.emoticon)}개`)],
+    ['사진 작가','사진·동영상·파일을 가장 많이 올림',pick(A.people,p=>p.media,p=>`첨부 ${fmtN(p.media)}개`)]
+  ].filter(x=>x[2]);
+  out.push(panel('awards','그 밖의 상','',`<div class="awards">${aw.map(([t,h,w])=>`<div class="award ${meCls(w.p.name)}" title="${h}"><div class="t">${t}</div><div class="p">${nm(w.p.name)}</div><div class="d">${w.d}</div></div>`).join('')}</div>`,true));
+  // 요약
+  const sum=[['수다왕',T.name],['웃음 제조기',A.laughers[0]?.name],['새벽 출몰자',owl?.name],['읽씹왕',A.seen[0]?.p.name],['환상의 짝꿍',A.pairs[0]?`${A.pairs[0].a}|${A.pairs[0].b}`:null],
+    ...aw.slice(0,5).map(([t,,w])=>[t,w.p.name])].filter(x=>x[1]);
+  out.push(panel('summary',`${esc(periodLabel())} 시상식`,'한 장 요약',`<div class="awards">${sum.map(([t,n])=>`<div class="award"><div class="t">${t}</div><div class="p">${n.includes('|')?n.split('|').map(nm).join(' ⇄ '):nm(n)}</div></div>`).join('')}
+    <div class="award"><div class="t">올해의 단어</div><div class="p">“${esc(A.topWords[0]?.[0]||'-')}”</div></div>
+    <div class="award"><div class="t">단톡 화력</div><div class="p">${A.score.toFixed(1)}점</div><div class="d">${G.label}</div></div></div>`,true));
+  $('#grid').innerHTML=out.join('');
+}
+
+function renderMembers(){
+  const d=state.data, box=$('#members');
+  const counts=new Map(); for(const m of d.msgs){ const n=state.alias.get(m.name)||m.name; counts.set(n,(counts.get(n)||0)+1); }
+  const names=[...counts.entries()].sort((a,b)=>b[1]-a[1]);
+  const bots=names.filter(([n])=>BOT_RE.test(n)).map(([n])=>n);
+  box.innerHTML=`<header style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><h3 style="margin:0;font-size:15px">멤버 관리</h3><small style="color:var(--faint);font-size:12px">전체 기간 메시지 수 · 제외 ${state.excl.size}명</small></header>
+    <p class="who-sub" style="margin:0 0 8px">챗봇·알림 계정은 <b>제외</b>를 누르면 모든 지표에서 빠집니다. <b>나</b>를 지정하면 순위표에서 강조됩니다. 닉네임이 바뀌어 둘로 나뉜 사람은 체크 후 합치세요.</p>
+    <div class="row">${bots.length?`<button class="btn line" type="button" data-act="bots">봇 추정 ${bots.length}개 ${bots.every(b=>state.excl.has(b))?'다시 포함':'모두 제외'}</button>`:''}
+      <button class="btn line" type="button" data-act="merge">체크한 이름 합치기</button>
+      ${state.alias.size?`<button class="btn line" type="button" data-act="unmerge">합치기 취소 (${state.alias.size})</button>`:''}</div>
+    <ul class="mlist">${names.map(([n,c])=>`<li class="${state.excl.has(n)?'off':''}"><input type="checkbox" class="mg" value="${esc(n)}" aria-label="${esc(n)} 합치기 선택">
+      <span class="nm" title="${esc(n)}">${esc(n)} ${BOT_RE.test(n)?'<span class="tag">봇 추정</span>':''}<br><span class="c num">${fmtN(c)}개</span></span>
+      <button type="button" class="tog ${state.me===n?'me':''}" data-me="${esc(n)}" aria-pressed="${state.me===n}">나</button>
+      <button type="button" class="tog ${state.excl.has(n)?'on':''}" data-ex="${esc(n)}" aria-pressed="${state.excl.has(n)}">${state.excl.has(n)?'제외됨':'제외'}</button></li>`).join('')}</ul>
+    ${d.unparsed?`<div class="warn">메시지처럼 보이지만 형식을 인식하지 못한 줄이 ${fmtN(d.unparsed)}개 있습니다(앞 메시지에 이어 붙음). 특정 사람이 빠졌다면 이 형식 때문일 수 있습니다.${d.samples.map(x=>`<code>${esc(x)}</code>`).join('')}</div>`:''}`;
+  $('#memberBtn').textContent=`멤버 관리${state.excl.size?` · 제외 ${state.excl.size}`:''}`;
+}
+
+function runAnalysis(){
+  const src=state.alias.size?state.data.msgs.map(m=>state.alias.has(m.name)?{...m,name:state.alias.get(m.name)}:m):state.data.msgs;
+  state.A=analyze(src,state.range,state.excl);
+  $('#rangeSeg').innerHTML=state.ranges.map(r=>`<button type="button" data-r="${r.key}" aria-pressed="${r===state.range}">${esc(r.label)}</button>`).join('');
+  renderHead(); renderGrid(); renderMembers();
+}
+function openResult(data,isSample,fileName){
+  if(!data.msgs.length) throw new Error('메시지를 하나도 읽지 못했습니다. 카카오톡 "대화 내보내기"로 받은 파일이 맞는지 확인해주세요.');
+  state.data=data; state.sample=!!isSample; state.fileName=fileName||'';
+  state.alias=new Map(); state.me='';
+  state.excl=new Set([...new Set(data.msgs.map(m=>m.name))].filter(n=>BOT_RE.test(n)));   // 봇 추정 계정은 기본 제외(해제 가능)
+  state.ranges=buildRanges(data.msgs); state.range=defaultRange(state.ranges,data.msgs);
+  $('#home').hidden=true; $('#result').hidden=false; document.querySelector('.glow').hidden=true;
+  $('#members').hidden=!state.excl.size; $('#memberBtn').setAttribute('aria-expanded',String(!!state.excl.size));
+  runAnalysis(); window.scrollTo(0,0);
 }
 
 /* ====================================================================
-   5. 화면 제어
+   5. 이벤트
    ==================================================================== */
-const $=s=>document.querySelector(s);
-let CARDS=[];
-function render(){
-  CARDS=cards();
-  state.idx=Math.min(state.idx,CARDS.length-1);
-  $('#cardHost').innerHTML=CARDS[state.idx];
-  $('#progress').innerHTML=CARDS.map((_,i)=>`<i class="${i<=state.idx?'on':''}"></i>`).join('');
-  $('#count').textContent=`${state.idx+1} / ${CARDS.length}`;
-  $('#prev').disabled=state.idx===0; $('#next').disabled=state.idx===CARDS.length-1;
-}
-function renderDiag(){
-  const A=state.A, d=state.data, box=$('#diag'); const wasOpen=box.open;
-  const inRange=new Set(A.people.map(p=>p.name));
-  const allNames=[...new Set(d.msgs.map(m=>state.alias.get(m.name)||m.name))];
-  const zero=allNames.filter(n=>!inRange.has(n));
-  const merged=[...state.alias.entries()];
-  box.innerHTML=`<summary>분석 확인 · 멤버 ${fmtN(A.people.length)}명${d.unparsed?` · <span style="color:var(--sun)">인식 못한 줄 ${fmtN(d.unparsed)}개</span>`:''}</summary>
-    <p>내 이름 <select id="meSel"><option value="">선택 안 함</option>${[...A.people.map(p=>p.name),...zero].map(n=>`<option ${n===state.me?'selected':''}>${esc(n)}</option>`).join('')}</select>
-    <span style="color:var(--mute)"> 고르면 5위 밖이어도 카드에 내 순위가 표시됩니다.</span></p>
-    <p style="color:var(--mute)">닉네임을 바꿔 한 사람이 두 이름으로 나뉘었다면, 두 이름을 체크하고 합치세요. 메시지가 더 많은 이름으로 합쳐집니다.</p>
-    <ol>${A.people.map((p,i)=>`<li class="${p.name===state.me?'me':''}"><label><input type="checkbox" class="mg" value="${esc(p.name)}"><span class="rk">${i+1}</span><span class="dn">${esc(p.name)}</span><span class="dc">${fmtN(p.count)}개</span></label></li>`).join('')}
-      ${zero.map(n=>`<li class="zero"><label><input type="checkbox" class="mg" value="${esc(n)}"><span class="rk">-</span><span class="dn">${esc(n)}</span><span class="dc">이 기간 0개</span></label></li>`).join('')}</ol>
-    <div class="row"><button class="btn" type="button" id="mergeBtn">선택한 이름 합치기</button>${merged.length?`<button class="btn ghost" type="button" id="unmergeBtn">합치기 취소 (${merged.length})</button>`:''}</div>
-    ${d.unparsed?`<p class="warn">메시지처럼 보이지만 형식을 인식하지 못한 줄이 ${fmtN(d.unparsed)}개 있습니다. 이 줄들은 앞 메시지에 이어 붙었습니다. 특정 사람이 빠졌다면 이 형식 때문일 수 있습니다. 예시:</p>${d.samples.map(x=>`<code>${esc(x)}</code>`).join('')}`:''}`;
-  box.open=wasOpen;
-}
-$('#diag').addEventListener('change',e=>{
-  if(e.target.id==='meSel'){ state.me=e.target.value; render(); renderDiag(); }
-});
-$('#diag').addEventListener('click',e=>{
-  if(e.target.id==='mergeBtn'){
-    const picked=[...document.querySelectorAll('#diag .mg:checked')].map(x=>x.value);
-    if(picked.length<2) return;
-    const cnt=n=>state.data.msgs.filter(m=>(state.alias.get(m.name)||m.name)===n).length;
-    const target=picked.sort((a,b)=>cnt(b)-cnt(a))[0];
-    for(const [k,v] of [...state.alias]) if(picked.includes(v)) state.alias.set(k,target);
-    for(const n of picked) if(n!==target) state.alias.set(n,target);
-    state.alias.delete(target);
-    if(picked.includes(state.me)) state.me=target;
-    runAnalysis();
-  }
-  if(e.target.id==='unmergeBtn'){ state.alias=new Map(); runAnalysis(); }
-});
-function go(d){ const n=state.idx+d; if(n<0||n>=CARDS.length) return; state.idx=n; render(); }
-function runAnalysis(){
-  const src = state.alias.size ? state.data.msgs.map(m=>state.alias.has(m.name)?{...m,name:state.alias.get(m.name)}:m) : state.data.msgs;
-  state.A=analyze(src,state.range);
-  const d=state.data;
-  $('#meta').textContent=`${state.sample?'샘플 데이터 · ':''}${d.format} 형식 · 전체 ${fmtN(d.msgs.length)}개 중 이 기간 ${fmtN(state.A.N)}개 분석${d.system?` · 시스템 메시지 ${fmtN(d.system)}개 제외`:''}`;
-  render(); renderDiag();
-}
-function openDeck(data,isSample){
-  if(!data.msgs.length) throw new Error('메시지를 하나도 읽지 못했습니다. 카카오톡 "대화 내보내기"로 받은 파일이 맞는지 확인해주세요.');
-  state.data=data; state.sample=!!isSample; state.idx=0; state.alias=new Map(); state.me='';
-  state.ranges=buildRanges(data.msgs);
-  state.range=defaultRange(state.ranges,data.msgs);
-  $('#range').innerHTML=state.ranges.map(r=>`<option value="${r.key}" ${r===state.range?'selected':''}>${esc(r.label)}</option>`).join('');
-  $('#home').hidden=true; $('#deck').hidden=false;
-  runAnalysis(); window.scrollTo(0,0);
-}
+const GUIDE={pc:'채팅방 → 우측 상단 ≡ → 대화 내용 → 대화 내보내기 → .txt 저장',
+  and:'채팅방 ≡ → 우측 상단 ⚙ → 대화 내용 내보내기 → 텍스트만 보내기',
+  ios:'채팅방 ≡ → 우측 상단 ⚙ → 대화 내용 내보내기 → 텍스트 메시지만 보내기 (.zip도 그대로 업로드 가능)',
+  mac:'채팅방 → 메뉴 → 대화 내보내기 → CSV로 저장'};
+document.querySelectorAll('[data-g]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-g]').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); $('#guide').textContent=GUIDE[b.dataset.g];
+}));
+$('#guide').textContent=GUIDE.pc;
+$('#methodBtn').addEventListener('click',e=>{ const m=$('#method'); m.hidden=!m.hidden; e.currentTarget.classList.toggle('on',!m.hidden); e.currentTarget.setAttribute('aria-expanded',String(!m.hidden)); });
+
 async function handleFile(file){
   const st=$('#status'); st.classList.remove('err'); st.textContent=`${file.name} 읽는 중…`;
   try{
-    const raw=await readChatFile(file);
-    st.textContent='분석 중…';
+    const raw=await readChatFile(file); st.textContent='분석 중…';
     await new Promise(r=>setTimeout(r,20));
-    const data=parseChat(raw);
-    openDeck(data,false); st.textContent='';
+    openResult(parseChat(raw),false,file.name); st.textContent='';
   }catch(e){ st.classList.add('err'); st.textContent=e.message||'파일을 읽지 못했습니다.'; }
 }
-
 $('#file').addEventListener('change',e=>{ const f=e.target.files[0]; if(f) handleFile(f); e.target.value=''; });
-$('#pick').addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('#file').click(); } });
 const drop=$('#drop');
 ['dragenter','dragover'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add('over');}));
 ['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over');}));
 drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
-$('#sampleBtn').addEventListener('click',()=>openDeck(parseChat(makeSample()),true));
-$('#backBtn').addEventListener('click',()=>{ state.data=null; state.A=null; $('#deck').hidden=true; $('#home').hidden=false; });
-$('#range').addEventListener('change',e=>{ state.range=state.ranges.find(r=>r.key===e.target.value); state.idx=0; runAnalysis(); });
-$('#mask').addEventListener('change',e=>{ state.mask=e.target.checked; render(); });
-$('#quote').addEventListener('change',e=>{ state.quote=e.target.checked; render(); });
-$('#prev').addEventListener('click',()=>go(-1));
-$('#next').addEventListener('click',()=>go(1));
-$('#tapL').addEventListener('click',()=>go(-1));
-$('#tapR').addEventListener('click',()=>go(1));
-document.addEventListener('keydown',e=>{ if($('#deck').hidden||!$('#modal').hidden) return; if(e.key==='ArrowRight') go(1); if(e.key==='ArrowLeft') go(-1); });
-let sx=null; const stage=$('#stage');
-stage.addEventListener('pointerdown',e=>{sx=e.clientX;});
-stage.addEventListener('pointerup',e=>{ if(sx==null) return; const dx=e.clientX-sx; sx=null; if(Math.abs(dx)>50){ e.stopPropagation(); go(dx<0?1:-1); } });
-
-$('#saveBtn').addEventListener('click',async()=>{
-  const btn=$('#saveBtn'); const el=$('#cardHost .card');
-  if(!window.html2canvas){ btn.textContent='이미지 엔진을 불러오지 못했습니다'; return; }
-  btn.disabled=true; btn.textContent='이미지 만드는 중…';
+$('#sampleBtn').addEventListener('click',()=>openResult(parseChat(makeSample()),true,'샘플'));
+$('#backBtn').addEventListener('click',()=>{ state.data=null; state.A=null; $('#result').hidden=true; $('#home').hidden=false; document.querySelector('.glow').hidden=false; });
+$('#rangeSeg').addEventListener('click',e=>{ const b=e.target.closest('[data-r]'); if(!b) return; state.range=state.ranges.find(r=>r.key===b.dataset.r); runAnalysis(); });
+$('#mask').addEventListener('change',e=>{ state.mask=e.target.checked; renderGrid(); });
+$('#quote').addEventListener('change',e=>{ state.quote=e.target.checked; renderGrid(); });
+$('#memberBtn').addEventListener('click',e=>{ const m=$('#members'); m.hidden=!m.hidden; e.currentTarget.setAttribute('aria-expanded',String(!m.hidden)); });
+$('#members').addEventListener('click',e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.ex!=null){ const n=t.dataset.ex; state.excl.has(n)?state.excl.delete(n):state.excl.add(n); runAnalysis(); }
+  else if(t.dataset.me!=null){ state.me=state.me===t.dataset.me?'':t.dataset.me; runAnalysis(); }
+  else if(t.dataset.act==='bots'){
+    const bots=[...new Set(state.data.msgs.map(m=>state.alias.get(m.name)||m.name))].filter(n=>BOT_RE.test(n));
+    const all=bots.every(b=>state.excl.has(b)); bots.forEach(b=>all?state.excl.delete(b):state.excl.add(b)); runAnalysis();
+  }
+  else if(t.dataset.act==='merge'){
+    const picked=[...document.querySelectorAll('#members .mg:checked')].map(x=>x.value); if(picked.length<2) return;
+    const cnt=n=>state.data.msgs.filter(m=>(state.alias.get(m.name)||m.name)===n).length;
+    const target=picked.sort((a,b)=>cnt(b)-cnt(a))[0];
+    for(const [k,v] of [...state.alias]) if(picked.includes(v)) state.alias.set(k,target);
+    for(const n of picked) if(n!==target){ state.alias.set(n,target); if(state.excl.has(n)){ state.excl.delete(n); } }
+    state.alias.delete(target); if(picked.includes(state.me)) state.me=target;
+    runAnalysis();
+  }
+  else if(t.dataset.act==='unmerge'){ state.alias=new Map(); runAnalysis(); }
+});
+$('#grid').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-save]'); if(!b) return;
+  const el=b.closest('.panel');
+  if(!window.html2canvas){ b.textContent='이미지 엔진 로드 실패'; return; }
+  b.disabled=true; b.textContent='만드는 중…';
   try{
     if(document.fonts&&document.fonts.ready) await document.fonts.ready;
-    el.style.animation='none';
-    const canvas=await html2canvas(el,{scale:Math.max(2,1080/el.offsetWidth),backgroundColor:null,logging:false});
+    const canvas=await html2canvas(el,{scale:2,backgroundColor:'#FFFFFF',logging:false,
+      ignoreElements:x=>x.classList&&x.classList.contains('noexp'),
+      onclone:doc=>{ doc.querySelectorAll('.exp-only').forEach(x=>x.style.display='flex'); }});
     const url=canvas.toDataURL('image/png');
     $('#modalImg').src=url; $('#modal').hidden=false;
-    try{ const a=document.createElement('a'); a.href=url; a.download=`talk-recap-${state.idx+1}.png`; document.body.appendChild(a); a.click(); a.remove(); }catch(e){}
-  }catch(e){ console.error(e); }
-  btn.disabled=false; btn.textContent='이미지로 저장';
+    try{ const a=document.createElement('a'); a.href=url; a.download=`talk-recap-${el.dataset.key}.png`; document.body.appendChild(a); a.click(); a.remove(); }catch(_){}
+  }catch(err){ console.error(err); }
+  b.disabled=false; b.textContent='이미지 저장';
 });
 $('#closeModal').addEventListener('click',()=>{ $('#modal').hidden=true; });
 $('#modal').addEventListener('click',e=>{ if(e.target.id==='modal') $('#modal').hidden=true; });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('#modal').hidden=true; });
 
 /* ====================================================================
-   6. 샘플 단톡방 생성기 (Android 내보내기 형식 텍스트를 만들어 같은 파서로 처리)
+   6. 샘플 단톡방 생성기 (Android 형식 텍스트 → 같은 파서로 처리)
    ==================================================================== */
 function makeSample(){
   let a=20261125; const R=()=>{ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
   const pick=arr=>arr[Math.floor(R()*arr.length)];
-  const ppl=[{n:'김민지',w:30,funny:.18},{n:'박서준',w:21,funny:.1,owl:true},{n:'이하윤',w:16,funny:.42},{n:'최도현',w:12,funny:.08},{n:'정지우',w:8,funny:.15},{n:'한태오',w:3,funny:.05}];
+  const ppl=[{n:'김민지',w:30,funny:.18},{n:'박서준',w:21,funny:.1,owl:true},{n:'이하윤',w:16,funny:.42},{n:'최도현',w:12,funny:.08},{n:'정지우',w:8,funny:.15},{n:'한태오',w:3,funny:.05},{n:'윤서아',w:5,funny:.2},{n:'오지훈',w:2,funny:.1}];
   const W=ppl.reduce((s,p)=>s+p.w,0);
   const who=()=>{ let r=R()*W; for(const p of ppl){ if((r-=p.w)<0) return p; } return ppl[0]; };
   const talk=['오늘 점심 뭐 먹지','퇴근하고 싶다','이번 주말에 다들 시간 돼?','연말 모임 언제 할까','진짜 미쳤다','나 오늘 지각할 뻔','회사 가기 싫어','치킨 먹고 싶다','그거 봤어?','대박','아 맞다','배고파','주말에 뭐해','넷플릭스 추천 좀','날씨 미쳤네','내일 비 온대','커피 마시러 갈 사람','다이어트는 내일부터','월급 언제 들어와','송년회 장소 정했어?','망원동 맛집 찾았음','오늘도 야근','운동 가기 싫다','그럼 토요일 7시?','나 그날 안 돼','콜','좋아 좋아','치킨 콜?','대박 진짜','연말 모임 장소 투표하자','고양이 사진 보내줘','퇴근 언제 해','다들 살아있냐','맛집 리스트 공유함','송년회 회비 3만원 어때'];
@@ -737,6 +775,8 @@ function makeSample(){
     const hot = d.getMonth()===11-1 && d.getDate()===14; // 송년회 날짜 정하던 날
     if(!hot && R()<0.16) continue;
     L.push(`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일`);
+    if(d.getDay()>0&&d.getDay()<6) L.push(`${stamp(d,7,30)}, 오늘학교 : [오늘의 급식] ${pick(['제육볶음','카레라이스','돈가스','비빔밥'])} / ${pick(['미역국','된장국','어묵국'])}`);
+    L.push(`${stamp(d,9,0)}, 채팅봇 : 오늘의 운세: ${pick(['맑음','흐림','대박','조심'])} · 행운의 단어 ${pick(['치킨','커피','산책'])}`);
     const ns = hot?6:1+Math.floor(R()*3);
     let t=8*60+Math.floor(R()*120);
     for(let s=0;s<ns;s++){
@@ -763,18 +803,6 @@ function makeSample(){
   return L.join('\n');
 }
 
-/* 첫 화면 미리보기: 샘플 데이터로 카드 3장을 실제로 렌더링 */
-(function preview(){
-  try{
-    const d=parseChat(makeSample());
-    state.data=d; state.ranges=buildRanges(d.msgs); state.range=state.ranges[0];
-    state.A=analyze(d.msgs,state.range);
-    const c=cards();
-    $('#preview').innerHTML=[c[1],c[5],c[3]].join('')+'<div class="preview-tag">샘플 단톡방 결과 예시</div>';
-    state.data=null; state.A=null;
-  }catch(e){ console.error(e); }
-})();
 </script>
-
 </body>
 </html>
